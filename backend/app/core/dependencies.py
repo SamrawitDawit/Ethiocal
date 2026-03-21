@@ -57,3 +57,28 @@ async def get_current_user(
         )
 
     return result.data
+
+async def get_current_auth_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    """Verify the Supabase access token and return the auth user ID.
+
+    Does NOT check the 'profiles' table. Use this for the POST /profile
+    endpoint where the profile row does not exist yet.
+    """
+    token = credentials.credentials
+    supabase = get_supabase_admin()
+
+    try:
+        auth_response = supabase.auth.get_user(token)
+        auth_user = auth_response.user
+
+        if auth_user is None:
+            raise ValueError("No user returned")
+        
+        return {"id": str(auth_user.id), "email": auth_user.email}
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+        )

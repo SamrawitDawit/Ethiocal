@@ -51,6 +51,11 @@ class _SignUpPageState extends State<SignUpPage> {
           backgroundColor: AppColors.primaryGreen,
         ),
       );
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/profile-setup/step1',
+        (route) => false,
+      );
       // TODO: Navigate to home screen once it exists
     } on ApiException catch (e) {
       if (!mounted) return;
