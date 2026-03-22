@@ -22,10 +22,12 @@ class ApiConstants {
       kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
   static const String registerEndpoint = '/api/v1/auth/register';
   static const String loginEndpoint = '/api/v1/auth/login';
+  static const String nutritionEndpoint = '/api/v1/nutrition/calculate-calories';
 }
 
 class RouteNames {
   static const String landing = '/';
   static const String signUp = '/sign-up';
   static const String login = '/login';
+  static const String mealEntry = '/meal-entry';
 }

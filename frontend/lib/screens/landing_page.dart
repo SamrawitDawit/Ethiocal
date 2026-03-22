@@ -38,6 +38,13 @@ class LandingPage extends StatelessWidget {
                     Navigator.pushNamed(context, RouteNames.signUp);
                   },
                 ),
+                const SizedBox(height: 12),
+                PrimaryButton(
+                  text: 'Track Meal (Test)',
+                  onPressed: () {
+                    Navigator.pushNamed(context, RouteNames.mealEntry);
+                  },
+                ),
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () {
