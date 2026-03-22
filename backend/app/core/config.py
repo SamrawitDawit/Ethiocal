@@ -1,35 +1,22 @@
-# ===========================================
-# EthioCal — Application Configuration
-# ===========================================
-# Loads environment variables and exposes them
-# as typed settings using pydantic-settings.
-# ===========================================
-
 from pydantic_settings import BaseSettings
+from pathlib import Path
+import os
 
+# Get the absolute path to the .env file
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+env_file = BASE_DIR / '.env'
 
 class Settings(BaseSettings):
-    """Central settings loaded from environment variables / .env file."""
-
-    # --- Supabase ---
     SUPABASE_URL: str
-    SUPABASE_KEY: str                          # anon / public key
-    SUPABASE_SERVICE_ROLE_KEY: str             # service-role key (admin access, bypasses RLS)
-    SUPABASE_JWT_SECRET: str                   # for verifying Supabase-issued JWTs
+    SUPABASE_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str
+    SUPABASE_JWT_SECRET: str
 
-    # --- Image Upload ---
-    MAX_IMAGE_SIZE_MB: int = 10
-    STORAGE_BUCKET: str = "food-images"        # Supabase Storage bucket name
+    class Config:
+        # Tell Pydantic to read the .env file directly
+        env_file = str(env_file)
+        env_file_encoding = 'utf-8'
+        case_sensitive = True
 
-    # --- AI Food Recognition ---
-    AI_MODEL_API_URL: str = ""
-    AI_MODEL_API_KEY: str = ""
-
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
-
-
-# Singleton instance — import this wherever settings are needed.
+# This line will now automatically read from the .env file specified in the Config class
 settings = Settings()

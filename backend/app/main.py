@@ -8,7 +8,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, food, meals, users, leaderboard
+from app.api.routes import auth, food, meals, users, leaderboard, nutrition
 from app.utils.error_handlers import register_error_handlers
 
 
@@ -36,6 +36,7 @@ app.include_router(food.router,        prefix="/api/v1/food",        tags=["Food
 app.include_router(meals.router,       prefix="/api/v1/meals",       tags=["Meals"])
 app.include_router(users.router,       prefix="/api/v1/users",       tags=["Users"])
 app.include_router(leaderboard.router, prefix="/api/v1/leaderboard", tags=["Leaderboard"])
+app.include_router(nutrition.router,   prefix="/api/v1/nutrition",   tags=["Nutrition"]) 
 
 
 @app.get("/", tags=["Health"])
