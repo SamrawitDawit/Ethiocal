@@ -1,9 +1,12 @@
 # ============================================
-# EthioCal — Food Recognition Routes
+# EthioCal — Food Routes
 # ============================================
-# POST /recognize — upload image → AI predict
-# GET  /          — list / search food items
-# GET  /{id}      — get one food item by ID
+# POST /recognize            — upload image → AI predict
+# GET  /                     — list / search food items
+# GET  /ingredients          — list all cooking ingredients
+# GET  /ingredients/{id}     — get one ingredient by ID
+# GET  /{id}/ingredients     — get standard ingredients for a food item
+# GET  /{id}                 — get one food item by ID (must be last!)
 # ============================================
 
 import uuid
@@ -13,7 +16,14 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, 
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.db.supabase import get_supabase_admin
-from app.schemas.food import FoodItemResponse, FoodRecognitionResponse, FoodRecognitionResult
+from app.schemas.food import (
+    FoodItemResponse,
+    FoodRecognitionResponse,
+    FoodRecognitionResult,
+    IngredientResponse,
+    FoodItemIngredientResponse,
+    FoodItemWithIngredientsResponse,
+)
 from app.services.food_recognition import predict_food
 
 router = APIRouter()
@@ -108,6 +118,83 @@ async def list_food_items(
         query = query.ilike("name", f"%{search}%")
 
     result = query.execute()
+    return result.data
+
+
+@router.get("/ingredients", response_model=list[IngredientResponse])
+async def list_ingredients(
+    search: str | None = Query(None, description="Filter ingredients by name"),
+    category: str | None = Query(None, description="Filter by category"),
+    current_user: dict = Depends(get_current_user),
+):
+    """List all cooking ingredients, optionally filtered."""
+    supabase = get_supabase_admin()
+    query = supabase.table("ingredients").select("*").order("name")
+
+    if search:
+        query = query.ilike("name", f"%{search}%")
+    if category:
+        query = query.eq("category", category)
+
+    result = query.execute()
+    return result.data
+
+
+@router.get("/ingredients/{ingredient_id}", response_model=IngredientResponse)
+async def get_ingredient(
+    ingredient_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Retrieve info for a single ingredient."""
+    supabase = get_supabase_admin()
+    result = (
+        supabase.table("ingredients")
+        .select("*")
+        .eq("id", ingredient_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ingredient not found.",
+        )
+
+    return result.data
+
+
+@router.get("/{food_id}/ingredients", response_model=list[FoodItemIngredientResponse])
+async def get_food_item_standard_ingredients(
+    food_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get the standard ingredients for a food item."""
+    supabase = get_supabase_admin()
+
+    # Verify food item exists
+    food_result = (
+        supabase.table("food_items")
+        .select("id")
+        .eq("id", food_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not food_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Food item not found.",
+        )
+
+    # Get standard ingredients with ingredient details
+    result = (
+        supabase.table("food_item_ingredients")
+        .select("*, ingredient:ingredients(*)")
+        .eq("food_item_id", food_id)
+        .execute()
+    )
+
     return result.data
 
 

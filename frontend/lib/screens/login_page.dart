@@ -48,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
           backgroundColor: AppColors.primaryGreen,
         ),
       );
-      // TODO: Navigate to home screen once it exists
+      Navigator.pushReplacementNamed(context, RouteNames.home);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,8 +79,7 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               // Top bar
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -89,8 +88,8 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     const Expanded(
-                      child: Center(
-                          child: AppLogo(imageHeight: 32, fontSize: 20)),
+                      child:
+                          Center(child: AppLogo(imageHeight: 32, fontSize: 20)),
                     ),
                     const SizedBox(width: 48),
                   ],

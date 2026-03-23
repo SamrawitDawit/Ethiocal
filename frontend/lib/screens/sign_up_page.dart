@@ -38,20 +38,33 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
 
     try {
-      await AuthService.register(
+      final authResponse = await AuthService.register(
         fullName: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully!'),
-          backgroundColor: AppColors.primaryGreen,
-        ),
-      );
-      // TODO: Navigate to home screen once it exists
+
+      if (authResponse.emailConfirmationRequired) {
+        // Show email confirmation message and go to login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created! Please check your email to verify your account.'),
+            backgroundColor: AppColors.primaryGreen,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        Navigator.pushReplacementNamed(context, RouteNames.login);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, RouteNames.home);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,8 +95,7 @@ class _SignUpPageState extends State<SignUpPage> {
             children: [
               // Top bar
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -92,8 +104,8 @@ class _SignUpPageState extends State<SignUpPage> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     const Expanded(
-                      child: Center(
-                          child: AppLogo(imageHeight: 32, fontSize: 20)),
+                      child:
+                          Center(child: AppLogo(imageHeight: 32, fontSize: 20)),
                     ),
                     const SizedBox(width: 48),
                   ],

@@ -2,34 +2,30 @@
 # EthioCal — Meal Schemas
 # ============================================
 # Request / response shapes for meals and
-# meal log entries.
+# meal entries.
 # ============================================
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
-from app.schemas.food import FoodItemResponse
+from app.schemas.food import FoodItemResponse, IngredientResponse
 
 
-# --- Meal creation ---
-
-class MealCreate(BaseModel):
-    """Create a new meal event."""
-    meal_type: str  # "breakfast" | "lunch" | "dinner" | "snack"
+MealType = Literal["breakfast", "lunch", "dinner", "snack"]
 
 
-# --- Meal log entry ---
+# --- Meal Food Item Entry ---
 
-class MealLogCreate(BaseModel):
-    """Log a food item eaten in a meal."""
-    meal_id: str
+class MealFoodItemEntry(BaseModel):
+    """A food item to add to a meal."""
     food_item_id: str
     quantity: float = 1.0
 
 
-class MealLogResponse(BaseModel):
-    """Single meal log entry with food details."""
+class MealFoodItemResponse(BaseModel):
+    """Food item in a meal with calculated calories."""
     id: str
     meal_id: str
     food_item_id: str
@@ -39,23 +35,93 @@ class MealLogResponse(BaseModel):
     created_at: datetime
 
 
-# --- Meal response ---
+# --- Meal Ingredient Entry ---
 
-class MealResponse(BaseModel):
-    """A meal with its logged food items."""
+class MealIngredientEntry(BaseModel):
+    """A cooking ingredient to add to a meal (optional)."""
+    ingredient_id: str
+    quantity: float = 1.0
+
+
+class MealIngredientResponse(BaseModel):
+    """Ingredient in a meal with calculated calories."""
+    id: str
+    meal_id: str
+    ingredient_id: str
+    quantity: float
+    total_calories: float
+    ingredient: IngredientResponse | None = None
+    created_at: datetime
+
+
+# --- Meal Creation (Step 1: Food Items) ---
+
+class MealCreate(BaseModel):
+    """Create a meal with selected food items."""
+    meal_type: MealType
+    food_items: list[MealFoodItemEntry]
+    portion_size: float = 1.0
+
+
+class MealCreateResponse(BaseModel):
+    """Response after creating meal with food items."""
     id: str
     user_id: str
     meal_type: str
-    image_url: str | None = None
-    created_at: datetime
-    meal_logs: list[MealLogResponse] = []
-
-
-# --- Daily summary ---
-
-class DailySummary(BaseModel):
-    """Aggregated calorie intake for a single day."""
-    date: str
+    portion_size: float
     total_calories: float
-    calorie_goal: float
-    meals: list[MealResponse]
+    food_items: list[MealFoodItemResponse]
+    created_at: datetime
+
+
+# --- Add Ingredients (Step 2: Optional) ---
+
+class MealAddIngredients(BaseModel):
+    """Add cooking ingredients to an existing meal (optional step)."""
+    ingredients: list[MealIngredientEntry]
+
+
+class MealAddIngredientsResponse(BaseModel):
+    """Response after adding ingredients."""
+    meal_id: str
+    ingredients: list[MealIngredientResponse]
+    added_calories: float
+    new_total_calories: float
+
+
+# --- Full Meal Response ---
+
+class MealResponse(BaseModel):
+    """Complete meal with food items and optional ingredients."""
+    id: str
+    user_id: str
+    meal_type: str
+    portion_size: float
+    total_calories: float
+    image_url: str | None = None
+    food_items: list[MealFoodItemResponse] = []
+    ingredients: list[MealIngredientResponse] = []
+    created_at: datetime
+
+
+# --- Nutrition Analysis ---
+
+class NutrientBreakdown(BaseModel):
+    """Detailed nutrient breakdown."""
+    calories: float
+    carbohydrates: float
+    protein: float
+    fat: float
+    fiber: float
+    sodium_mg: float = 0.0
+    sugar: float = 0.0
+    cholesterol_mg: float = 0.0
+
+
+class MealNutritionAnalysis(BaseModel):
+    """Full nutritional analysis of a meal."""
+    meal_id: str
+    meal_type: str
+    nutrients: NutrientBreakdown
+    food_items_count: int
+    ingredients_count: int

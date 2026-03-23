@@ -20,12 +20,29 @@ class ApiConstants {
   // Web uses localhost directly; Android emulator uses 10.0.2.2 alias.
   static String get baseUrl =>
       kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
+
+  // Auth endpoints
   static const String registerEndpoint = '/api/v1/auth/register';
   static const String loginEndpoint = '/api/v1/auth/login';
+
+  // User endpoints
+  static const String setupProfileEndpoint = '/api/v1/users/setup-profile';
+  static const String meEndpoint = '/api/v1/users/me';
+
+  // Meal endpoints
+  static const String mealsEndpoint = '/api/v1/meals';
+
+  // Food endpoints
+  static const String foodEndpoint = '/api/v1/food';
+  static const String ingredientsEndpoint = '/api/v1/food/ingredients';
+  static const String foodRecognizeEndpoint = '/api/v1/food/recognize';
 }
 
 class RouteNames {
   static const String landing = '/';
   static const String signUp = '/sign-up';
   static const String login = '/login';
+  static const String home = '/home';
+  static const String mealEntry = '/meal-entry';
+  static const String profileSetup = '/profile-setup';
 }

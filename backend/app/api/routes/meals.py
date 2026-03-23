@@ -1,22 +1,23 @@
 # ============================================
 # EthioCal — Meal Routes
 # ============================================
-# POST /              — create a meal
-# POST /log           — log a food item to a meal
-# GET  /history       — user's meal history
-# GET  /daily-summary — calorie summary for a day
+# POST /                  — create meal with food items
+# POST /{id}/ingredients  — add ingredients to meal (optional)
+# GET  /                  — user's meal history
+# GET  /{id}              — get single meal
+# DELETE /{id}            — delete a meal
 # ============================================
-
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.dependencies import get_current_user
 from app.db.supabase import get_supabase_admin
 from app.schemas.meal import (
-    MealCreate, MealResponse,
-    MealLogCreate, MealLogResponse,
-    DailySummary,
+    MealCreate,
+    MealCreateResponse,
+    MealAddIngredients,
+    MealAddIngredientsResponse,
+    MealResponse,
 )
 
 router = APIRouter()
@@ -24,159 +25,351 @@ router = APIRouter()
 VALID_MEAL_TYPES = {"breakfast", "lunch", "dinner", "snack"}
 
 
-@router.post("/", response_model=MealResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=MealCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_meal(
     payload: MealCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    """Create a new meal event (breakfast / lunch / dinner / snack)."""
+    """Create a new meal with selected food items.
+
+    Step 1 of meal logging - select the foods you ate.
+    """
     if payload.meal_type not in VALID_MEAL_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"meal_type must be one of {VALID_MEAL_TYPES}.",
         )
 
-    supabase = get_supabase_admin()
-    result = (
-        supabase.table("meals")
-        .insert({
-            "user_id": current_user["id"],
-            "meal_type": payload.meal_type,
-        })
-        .execute()
-    )
+    if not payload.food_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one food item is required.",
+        )
 
-    meal = result.data[0]
-    meal["meal_logs"] = []  # new meal has no logs yet
-    return meal
-
-
-@router.post("/log", response_model=MealLogResponse, status_code=status.HTTP_201_CREATED)
-async def log_food_item(
-    payload: MealLogCreate,
-    current_user: dict = Depends(get_current_user),
-):
-    """Log a food item to an existing meal.
-
-    Calculates total_calories as quantity * food_item.calories.
-    """
     supabase = get_supabase_admin()
     user_id = current_user["id"]
 
-    # Verify the meal belongs to the current user
+    # Fetch all food items in one query
+    food_ids = [item.food_item_id for item in payload.food_items]
+    food_result = (
+        supabase.table("food_items")
+        .select("*")
+        .in_("id", food_ids)
+        .execute()
+    )
+
+    food_map = {f["id"]: f for f in food_result.data}
+
+    # Validate all food items exist
+    missing = [fid for fid in food_ids if fid not in food_map]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Food items not found: {missing}",
+        )
+
+    # Calculate total calories
+    total_calories = 0.0
+    for item in payload.food_items:
+        food = food_map[item.food_item_id]
+        total_calories += item.quantity * food["calories_per_serving"]
+
+    # Create the meal
     meal_result = (
         supabase.table("meals")
-        .select("id, user_id")
-        .eq("id", payload.meal_id)
+        .insert({
+            "user_id": user_id,
+            "meal_type": payload.meal_type,
+            "portion_size": payload.portion_size,
+            "total_calories": total_calories,
+        })
+        .execute()
+    )
+    meal = meal_result.data[0]
+
+    # Create meal food items
+    food_items_response = []
+    for item in payload.food_items:
+        food = food_map[item.food_item_id]
+        item_calories = item.quantity * food["calories_per_serving"]
+
+        item_result = (
+            supabase.table("meal_food_items")
+            .insert({
+                "meal_id": meal["id"],
+                "food_item_id": item.food_item_id,
+                "quantity": item.quantity,
+                "total_calories": item_calories,
+            })
+            .execute()
+        )
+
+        item_data = item_result.data[0]
+        item_data["food_item"] = food
+        food_items_response.append(item_data)
+
+    return MealCreateResponse(
+        id=meal["id"],
+        user_id=meal["user_id"],
+        meal_type=meal["meal_type"],
+        portion_size=meal["portion_size"],
+        total_calories=total_calories,
+        food_items=food_items_response,
+        created_at=meal["created_at"],
+    )
+
+
+@router.post("/{meal_id}/ingredients", response_model=MealAddIngredientsResponse)
+async def add_ingredients_to_meal(
+    meal_id: str,
+    payload: MealAddIngredients,
+    current_user: dict = Depends(get_current_user),
+):
+    """Add cooking ingredients to an existing meal (optional).
+
+    Step 2 of meal logging - optionally specify cooking ingredients.
+
+    Ingredient adjustment logic:
+    - If the ingredient is a standard ingredient for any food item in the meal,
+      only the DIFFERENCE (user quantity - standard quantity) affects calories.
+    - If it's a new ingredient (not in standard), the full calorie value is added.
+    """
+    if not payload.ingredients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one ingredient is required.",
+        )
+
+    supabase = get_supabase_admin()
+    user_id = current_user["id"]
+
+    # Verify meal exists and belongs to user
+    meal_result = (
+        supabase.table("meals")
+        .select("*")
+        .eq("id", meal_id)
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
+
     if not meal_result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Meal not found.",
         )
 
-    # Get the food item for calorie calculation
-    food_result = (
-        supabase.table("food_items")
+    meal = meal_result.data
+
+    # Fetch all ingredients
+    ingredient_ids = [ing.ingredient_id for ing in payload.ingredients]
+    ing_result = (
+        supabase.table("ingredients")
         .select("*")
-        .eq("id", payload.food_item_id)
-        .maybe_single()
+        .in_("id", ingredient_ids)
         .execute()
     )
-    if not food_result.data:
+
+    ing_map = {i["id"]: i for i in ing_result.data}
+
+    # Validate all ingredients exist
+    missing = [iid for iid in ingredient_ids if iid not in ing_map]
+    if missing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Food item not found.",
+            detail=f"Ingredients not found: {missing}",
         )
 
-    food_item = food_result.data
-    total_calories = payload.quantity * food_item["calories"]
-
-    # Insert the meal log
-    log_result = (
-        supabase.table("meal_logs")
-        .insert({
-            "user_id": user_id,
-            "meal_id": payload.meal_id,
-            "food_item_id": payload.food_item_id,
-            "quantity": payload.quantity,
-            "total_calories": total_calories,
-        })
+    # Get food items in this meal
+    meal_food_items_result = (
+        supabase.table("meal_food_items")
+        .select("food_item_id, quantity")
+        .eq("meal_id", meal_id)
         .execute()
     )
 
-    # Attach the food_item data to the response
-    log_data = log_result.data[0]
-    log_data["food_item"] = food_item
-    return log_data
+    food_item_ids = [fi["food_item_id"] for fi in meal_food_items_result.data]
+    food_item_quantities = {fi["food_item_id"]: fi["quantity"] for fi in meal_food_items_result.data}
+
+    # Get standard ingredients for all food items in this meal
+    standard_ingredients = {}
+    if food_item_ids:
+        std_ing_result = (
+            supabase.table("food_item_ingredients")
+            .select("*")
+            .in_("food_item_id", food_item_ids)
+            .execute()
+        )
+
+        # Aggregate standard quantities per ingredient
+        # If same ingredient is standard for multiple food items, sum them up
+        for std in std_ing_result.data:
+            ing_id = std["ingredient_id"]
+            food_qty = food_item_quantities.get(std["food_item_id"], 1.0)
+            # Standard quantity is scaled by how many servings of the food
+            std_qty = std["standard_quantity"] * food_qty
+            if ing_id in standard_ingredients:
+                standard_ingredients[ing_id] += std_qty
+            else:
+                standard_ingredients[ing_id] = std_qty
+
+    # Add ingredients and calculate calories with adjustment
+    added_calories = 0.0
+    ingredients_response = []
+
+    for ing in payload.ingredients:
+        ingredient = ing_map[ing.ingredient_id]
+        user_quantity = ing.quantity
+        standard_qty = standard_ingredients.get(ing.ingredient_id, 0.0)
+
+        # Calculate the difference - only extra/less from standard affects calories
+        quantity_difference = user_quantity - standard_qty
+
+        # Calories are based on the difference, which can be negative (used less than standard)
+        ing_calories = quantity_difference * ingredient["calories_per_serving"]
+        added_calories += ing_calories
+
+        ing_insert_result = (
+            supabase.table("meal_ingredients")
+            .insert({
+                "meal_id": meal_id,
+                "ingredient_id": ing.ingredient_id,
+                "quantity": user_quantity,
+                "total_calories": ing_calories,
+            })
+            .execute()
+        )
+
+        ing_data = ing_insert_result.data[0]
+        ing_data["ingredient"] = ingredient
+        ingredients_response.append(ing_data)
+
+    # Update meal total calories
+    new_total = meal["total_calories"] + added_calories
+    supabase.table("meals").update({"total_calories": new_total}).eq("id", meal_id).execute()
+
+    return MealAddIngredientsResponse(
+        meal_id=meal_id,
+        ingredients=ingredients_response,
+        added_calories=added_calories,
+        new_total_calories=new_total,
+    )
 
 
-@router.get("/history", response_model=list[MealResponse])
+@router.get("/", response_model=list[MealResponse])
 async def get_meal_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return the current user's meal history (newest first).
-
-    Uses Supabase's nested select to include meal_logs
-    and their related food_items in a single query.
-    """
+    """Return the current user's meal history (newest first)."""
     supabase = get_supabase_admin()
-    result = (
+
+    # Get meals
+    meals_result = (
         supabase.table("meals")
-        .select("*, meal_logs(*, food_item:food_items(*))")
+        .select("*")
         .eq("user_id", current_user["id"])
         .order("created_at", desc=True)
         .range(skip, skip + limit - 1)
         .execute()
     )
 
-    # Rename the nested 'food_item' key from the join to match our schema
-    meals = result.data
-    for meal in meals:
-        for log in meal.get("meal_logs", []):
-            log["food_item"] = log.pop("food_item", None)
+    meals = []
+    for meal in meals_result.data:
+        # Get food items for this meal
+        food_items_result = (
+            supabase.table("meal_food_items")
+            .select("*, food_item:food_items(*)")
+            .eq("meal_id", meal["id"])
+            .execute()
+        )
+
+        # Get ingredients for this meal
+        ingredients_result = (
+            supabase.table("meal_ingredients")
+            .select("*, ingredient:ingredients(*)")
+            .eq("meal_id", meal["id"])
+            .execute()
+        )
+
+        meal["food_items"] = food_items_result.data
+        meal["ingredients"] = ingredients_result.data
+        meals.append(meal)
 
     return meals
 
 
-@router.get("/daily-summary", response_model=DailySummary)
-async def daily_summary(
-    day: date = Query(default=None, description="Date in YYYY-MM-DD format. Defaults to today."),
+@router.get("/{meal_id}", response_model=MealResponse)
+async def get_meal(
+    meal_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get a calorie summary for a specific date."""
-    target = day or date.today()
-    start = f"{target}T00:00:00+00:00"
-    end = f"{target}T23:59:59+00:00"
-
+    """Get a single meal by ID."""
     supabase = get_supabase_admin()
-    result = (
+
+    meal_result = (
         supabase.table("meals")
-        .select("*, meal_logs(*, food_item:food_items(*))")
+        .select("*")
+        .eq("id", meal_id)
         .eq("user_id", current_user["id"])
-        .gte("created_at", start)
-        .lte("created_at", end)
-        .order("created_at")
+        .maybe_single()
         .execute()
     )
 
-    meals = result.data
+    if not meal_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meal not found.",
+        )
 
-    # Rename nested key and compute total
-    total = 0.0
-    for meal in meals:
-        for log in meal.get("meal_logs", []):
-            log["food_item"] = log.pop("food_item", None)
-            total += log.get("total_calories", 0.0)
+    meal = meal_result.data
 
-    return DailySummary(
-        date=target.isoformat(),
-        total_calories=total,
-        calorie_goal=current_user["daily_calorie_goal"],
-        meals=meals,
+    # Get food items
+    food_items_result = (
+        supabase.table("meal_food_items")
+        .select("*, food_item:food_items(*)")
+        .eq("meal_id", meal_id)
+        .execute()
     )
+
+    # Get ingredients
+    ingredients_result = (
+        supabase.table("meal_ingredients")
+        .select("*, ingredient:ingredients(*)")
+        .eq("meal_id", meal_id)
+        .execute()
+    )
+
+    meal["food_items"] = food_items_result.data
+    meal["ingredients"] = ingredients_result.data
+
+    return meal
+
+
+@router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_meal(
+    meal_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a meal."""
+    supabase = get_supabase_admin()
+
+    # Verify meal exists and belongs to user
+    meal_result = (
+        supabase.table("meals")
+        .select("id")
+        .eq("id", meal_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    if not meal_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meal not found.",
+        )
+
+    # Delete cascades to meal_food_items and meal_ingredients
+    supabase.table("meals").delete().eq("id", meal_id).execute()

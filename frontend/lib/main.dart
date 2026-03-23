@@ -3,6 +3,8 @@ import 'constants/app_constants.dart';
 import 'screens/landing_page.dart';
 import 'screens/sign_up_page.dart';
 import 'screens/login_page.dart';
+import 'screens/home_page.dart';
+import 'screens/meal_entry_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +29,8 @@ class EthioCalApp extends StatelessWidget {
         RouteNames.landing: (context) => const LandingPage(),
         RouteNames.signUp: (context) => const SignUpPage(),
         RouteNames.login: (context) => const LoginPage(),
+        RouteNames.home: (context) => const HomePage(),
+        RouteNames.mealEntry: (context) => const MealEntryPage(),
       },
     );
   }

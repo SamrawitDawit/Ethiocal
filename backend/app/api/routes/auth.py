@@ -20,14 +20,14 @@ async def register(payload: UserCreate):
     Steps:
       1. Call Supabase sign_up with email, password, and user metadata.
       2. Supabase creates the auth user and issues tokens.
-      3. A database trigger auto-creates a matching row in the profiles table.
-      4. Update the profile with health fields that don't fit in user_metadata.
-      5. Return the tokens and profile.
+      3. Create a matching row in the profiles table.
+      4. Return the tokens and basic profile.
+
+    Note: Health info setup is done separately via POST /api/v1/users/setup-profile.
     """
     supabase = get_supabase()
 
     try:
-        # Sign up through Supabase Auth — full_name is stored in user_metadata
         auth_response = supabase.auth.sign_up({
             "email": payload.email,
             "password": payload.password,
@@ -50,30 +50,46 @@ async def register(payload: UserCreate):
         )
 
     user_id = str(auth_response.user.id)
-
-    # Update the profile with health condition fields.
-    # The trigger already created the profile row with id, email, full_name.
     admin = get_supabase_admin()
-    admin.table("profiles").update({
-        "has_diabetes": payload.has_diabetes,
-        "has_hypertension": payload.has_hypertension,
-        "has_heart_disease": payload.has_heart_disease,
-        "daily_calorie_goal": payload.daily_calorie_goal,
-    }).eq("id", user_id).execute()
 
-    # Fetch the completed profile to return
-    profile = (
+    # Check if profile was created by trigger, if not create it manually
+    profile_result = (
         admin.table("profiles")
         .select("*")
         .eq("id", user_id)
-        .single()
+        .maybe_single()
         .execute()
     )
+
+    if profile_result.data:
+        profile = profile_result.data
+    else:
+        # Create profile manually if trigger didn't run
+        insert_result = (
+            admin.table("profiles")
+            .insert({
+                "id": user_id,
+                "email": payload.email,
+                "full_name": payload.full_name,
+            })
+            .execute()
+        )
+        profile = insert_result.data[0]
+
+    # Handle case where email confirmation is required (session will be None)
+    if not auth_response.session:
+        return AuthResponse(
+            access_token="",
+            refresh_token="",
+            user=profile,
+            email_confirmation_required=True,
+        )
 
     return AuthResponse(
         access_token=auth_response.session.access_token,
         refresh_token=auth_response.session.refresh_token,
-        user=profile.data,
+        user=profile,
+        email_confirmation_required=False,
     )
 
 
@@ -110,7 +126,7 @@ async def login(payload: UserLogin):
         admin.table("profiles")
         .select("*")
         .eq("id", str(auth_response.user.id))
-        .single()
+        .maybe_single()
         .execute()
     )
 

@@ -4,6 +4,7 @@
 # Verifies the Supabase JWT from the
 # Authorization header and returns the
 # current user's profile from the database.
+# Includes role-based access control.
 # ============================================
 
 from fastapi import Depends, HTTPException, status
@@ -57,3 +58,37 @@ async def get_current_user(
         )
 
     return result.data
+
+
+async def get_current_admin(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Require the current user to have admin role.
+
+    Use as a dependency for admin-only endpoints.
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return current_user
+
+
+def require_role(allowed_roles: list[str]):
+    """Factory function to create a role-checking dependency.
+
+    Usage:
+        @router.get("/admin-only", dependencies=[Depends(require_role(["admin"]))])
+        async def admin_only_endpoint():
+            ...
+    """
+    async def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
+        user_role = current_user.get("role", "user")
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required role: {', '.join(allowed_roles)}.",
+            )
+        return current_user
+    return role_checker
