@@ -111,6 +111,10 @@ create table if not exists public.food_items (
     fiber_g         float default 0.0,
     serving_size_g  float default 100.0,
 
+    -- Portion estimation geometry defaults
+    avg_thickness_cm    float,
+    density_g_per_cm3   float,
+
     -- Label the AI model maps to this food
     ai_label        text unique,
 
@@ -214,15 +218,41 @@ create policy "Public read access for food images"
 -- 7. Sample Ethiopian food data (seed)
 -- =============================================
 
-insert into public.food_items (name, name_amharic, category, calories, protein_g, carbs_g, fat_g, fiber_g, serving_size_g, ai_label) values
-    ('Doro Wot',        'ዶሮ ወጥ',       'wot',    350, 28.0, 15.0, 18.0, 3.0, 250.0, 'doro_wot'),
-    ('Injera',          'እንጀራ',        'bread',  125,  4.0, 24.0,  1.0, 2.5, 100.0, 'injera'),
-    ('Shiro Wot',       'ሽሮ ወጥ',       'wot',    280, 16.0, 32.0,  8.0, 8.0, 200.0, 'shiro_wot'),
-    ('Kitfo',           'ክትፎ',         'meat',   400, 22.0,  2.0, 34.0, 0.5, 150.0, 'kitfo'),
-    ('Tibs',            'ጥብስ',         'meat',   320, 30.0,  5.0, 20.0, 1.0, 200.0, 'tibs'),
-    ('Misir Wot',       'ምስር ወጥ',      'wot',    230, 14.0, 30.0,  5.0, 9.0, 200.0, 'misir_wot'),
-    ('Gomen',           'ጎመን',         'vegetable', 90,  4.0, 10.0,  4.0, 5.0, 150.0, 'gomen'),
-    ('Ayib',            'አይብ',         'dairy',  120,  8.0,  3.0,  9.0, 0.0, 100.0, 'ayib'),
-    ('Firfir',          'ፍርፍር',        'bread',  200,  6.0, 28.0,  7.0, 3.0, 150.0, 'firfir'),
-    ('Chechebsa',       'ጨጨብሳ',       'bread',  350,  6.0, 40.0, 18.0, 2.0, 180.0, 'chechebsa')
+insert into public.food_items (
+    name,
+    name_amharic,
+    category,
+    calories,
+    protein_g,
+    carbs_g,
+    fat_g,
+    fiber_g,
+    serving_size_g,
+    avg_thickness_cm,
+    density_g_per_cm3,
+    ai_label
+) values
+    ('Doro Wot',        'ዶሮ ወጥ',       'wot',    350, 28.0, 15.0, 18.0, 3.0, 250.0, 2.50, 1.03, 'doro_wot'),
+    ('Injera',          'እንጀራ',        'bread',  125,  4.0, 24.0,  1.0, 2.5, 100.0, 0.35, 0.72, 'injera'),
+    ('Shiro Wot',       'ሽሮ ወጥ',       'wot',    280, 16.0, 32.0,  8.0, 8.0, 200.0, 2.20, 1.02, 'shiro_wot'),
+    ('Kitfo',           'ክትፎ',         'meat',   400, 22.0,  2.0, 34.0, 0.5, 150.0, 1.80, 1.00, 'kitfo'),
+    ('Tibs',            'ጥብስ',         'meat',   320, 30.0,  5.0, 20.0, 1.0, 200.0, 1.50, 1.05, 'tibs'),
+    ('Misir Wot',       'ምስር ወጥ',      'wot',    230, 14.0, 30.0,  5.0, 9.0, 200.0, 2.10, 1.01, 'misir_wot'),
+    ('Gomen',           'ጎመን',         'vegetable', 90,  4.0, 10.0,  4.0, 5.0, 150.0, 1.20, 0.92, 'gomen'),
+    ('Ayib',            'አይብ',         'dairy',  120,  8.0,  3.0,  9.0, 0.0, 100.0, 1.40, 0.98, 'ayib'),
+    ('Firfir',          'ፍርፍር',        'bread',  200,  6.0, 28.0,  7.0, 3.0, 150.0, 1.40, 0.88, 'firfir'),
+    ('Chechebsa',       'ጨጨብሳ',       'bread',  350,  6.0, 40.0, 18.0, 2.0, 180.0, 1.70, 0.90, 'chechebsa')
 on conflict (ai_label) do nothing;
+
+
+-- =============================================
+-- 8. Backward-compatible migration snippet
+-- =============================================
+-- Run this for existing databases created before
+-- avg_thickness_cm / density_g_per_cm3 were added.
+
+alter table public.food_items
+    add column if not exists avg_thickness_cm float;
+
+alter table public.food_items
+    add column if not exists density_g_per_cm3 float;

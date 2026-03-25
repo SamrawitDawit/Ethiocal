@@ -19,8 +19,12 @@ from app.schemas.food import (
     FoodRecognitionResult,
     BoundingBox,
     SegmentationMask,
+    PortionFoodProfile,
+    PortionEstimateResponse,
+    PortionEstimationRequest,
 )
 from app.services.food_recognition import predict_food
+from app.services.portion_estimation import estimate_portions
 
 router = APIRouter()
 
@@ -137,6 +141,49 @@ async def list_food_items(
 
     result = query.execute()
     return result.data
+
+
+@router.post("/estimate-portion", response_model=PortionEstimateResponse)
+async def estimate_food_portion(
+    payload: PortionEstimationRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Estimate food portion size with hybrid geometry and fallback logic."""
+    supabase = get_supabase_admin()
+
+    food_ids = list({region.food_item_id for region in payload.foods})
+    if not food_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one detected food region is required.",
+        )
+
+    query = (
+        supabase.table("food_items")
+        .select("id, avg_thickness_cm, density_g_per_cm3, serving_size_g")
+        .in_("id", food_ids)
+        .execute()
+    )
+
+    food_map: dict[str, PortionFoodProfile] = {
+        row["id"]: PortionFoodProfile(**row)
+        for row in query.data
+    }
+
+    missing_ids = [food_id for food_id in food_ids if food_id not in food_map]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown food_item_id values: {missing_ids}",
+        )
+
+    try:
+        return estimate_portions(payload, food_map)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/{food_id}", response_model=FoodItemResponse)
