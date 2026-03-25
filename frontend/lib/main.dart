@@ -3,6 +3,7 @@ import 'constants/app_constants.dart';
 import 'screens/landing_page.dart';
 import 'screens/sign_up_page.dart';
 import 'screens/login_page.dart';
+import 'screens/food_recognition_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,11 +23,12 @@ class EthioCalApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.background,
         useMaterial3: true,
       ),
-      initialRoute: RouteNames.landing,
+      initialRoute: RouteNames.foodRecognition,
       routes: {
         RouteNames.landing: (context) => const LandingPage(),
         RouteNames.signUp: (context) => const SignUpPage(),
         RouteNames.login: (context) => const LoginPage(),
+        RouteNames.foodRecognition: (context) => const FoodRecognitionPage(),
       },
     );
   }

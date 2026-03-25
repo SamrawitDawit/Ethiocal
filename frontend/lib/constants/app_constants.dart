@@ -28,4 +28,5 @@ class RouteNames {
   static const String landing = '/';
   static const String signUp = '/sign-up';
   static const String login = '/login';
+  static const String foodRecognition = '/food-recognition';
 }

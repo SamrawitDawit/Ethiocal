@@ -5,6 +5,8 @@
 # app so errors return consistent JSON.
 # ============================================
 
+import traceback
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -27,8 +29,9 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def general_error_handler(_request: Request, exc: Exception):
         """Catch-all: return 500 without leaking internal details."""
-        # Log the actual error for debugging (replace with proper logging in production)
+        # Log the actual error with full traceback for debugging
         print(f"Unhandled error: {exc}")
+        traceback.print_exc()
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "An unexpected error occurred. Please try again later."},

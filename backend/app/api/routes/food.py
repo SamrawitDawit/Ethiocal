@@ -13,7 +13,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, 
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.db.supabase import get_supabase_admin
-from app.schemas.food import FoodItemResponse, FoodRecognitionResponse, FoodRecognitionResult
+from app.schemas.food import (
+    FoodItemResponse,
+    FoodRecognitionResponse,
+    FoodRecognitionResult,
+    BoundingBox,
+    SegmentationMask,
+)
 from app.services.food_recognition import predict_food
 
 router = APIRouter()
@@ -22,7 +28,7 @@ router = APIRouter()
 @router.post("/recognize", response_model=FoodRecognitionResponse)
 async def recognize_food(
     image: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    # current_user: dict = Depends(get_current_user),  # TODO: re-enable auth after testing
 ):
     """Upload a food image and get AI-powered recognition results.
 
@@ -51,7 +57,8 @@ async def recognize_food(
 
     # --- Upload to Supabase Storage ---
     ext = image.filename.rsplit(".", 1)[-1] if image.filename else "jpg"
-    filename = f"{current_user['id']}/{uuid.uuid4()}.{ext}"
+    #filename = f"{current_user['id']}/{uuid.uuid4()}.{ext}"  # TODO: use current_user['id'] after re-enabling auth
+    filename = f"anonymous/{uuid.uuid4()}.{ext}"  # TODO: use current_user['id'] after re-enabling auth
 
     supabase = get_supabase_admin()
     supabase.storage.from_(settings.STORAGE_BUCKET).upload(
@@ -64,7 +71,7 @@ async def recognize_food(
     image_url = supabase.storage.from_(settings.STORAGE_BUCKET).get_public_url(filename)
 
     # --- AI prediction ---
-    predictions = await predict_food(contents, filename)
+    predictions, image_width, image_height = await predict_food(contents, filename)
 
     # --- Match labels to food items in DB ---
     results: list[FoodRecognitionResult] = []
@@ -72,27 +79,48 @@ async def recognize_food(
         label = pred["label"]
         confidence = pred["confidence"]
 
-        result = (
-            supabase.table("food_items")
-            .select("*")
-            .eq("ai_label", label)
-            .maybe_single()
-            .execute()
-        )
-
+        # Try to match label to food item in DB (optional - may not exist)
         food_item = None
-        if result.data:
-            food_item = FoodItemResponse(**result.data)
+        try:
+            result = (
+                supabase.table("food_items")
+                .select("*")
+                .eq("ai_label", label)
+                .maybe_single()
+                .execute()
+            )
+            if result and result.data:
+                food_item = FoodItemResponse(**result.data)
+        except Exception:
+            # DB lookup failed - continue without food_item data
+            pass
+
+        # Build bounding box from prediction
+        bbox = None
+        if pred.get("bounding_box"):
+            bbox = BoundingBox(**pred["bounding_box"])
+
+        # Build mask from prediction
+        mask = None
+        if pred.get("mask"):
+            mask = SegmentationMask(**pred["mask"])
 
         results.append(
             FoodRecognitionResult(
                 label=label,
                 confidence=confidence,
+                bounding_box=bbox,
+                mask=mask,
                 food_item=food_item,
             )
         )
 
-    return FoodRecognitionResponse(predictions=results, image_url=image_url)
+    return FoodRecognitionResponse(
+        predictions=results,
+        image_url=image_url,
+        image_width=image_width,
+        image_height=image_height,
+    )
 
 
 @router.get("/", response_model=list[FoodItemResponse])
