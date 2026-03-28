@@ -1,9 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import '../widgets/app_background.dart';
+
+enum PlateGuideShape { circle, oval, rectangle }
+
+class PlateGuidePainter extends CustomPainter {
+  final PlateGuideShape shape;
+  final Color color;
+
+  PlateGuidePainter({required this.shape, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokePaint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final fillPaint = Paint()
+      ..color = color.withOpacity(0.08)
+      ..style = PaintingStyle.fill;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final guideWidth = size.width * 0.72;
+    final guideHeight = size.height * 0.52;
+    final guideRect = Rect.fromCenter(
+      center: center,
+      width: guideWidth,
+      height: guideHeight,
+    );
+
+    switch (shape) {
+      case PlateGuideShape.circle:
+        final radius = guideRect.shortestSide / 2;
+        canvas.drawCircle(center, radius, fillPaint);
+        canvas.drawCircle(center, radius, strokePaint);
+        break;
+      case PlateGuideShape.oval:
+        canvas.drawOval(guideRect, fillPaint);
+        canvas.drawOval(guideRect, strokePaint);
+        break;
+      case PlateGuideShape.rectangle:
+        const radius = Radius.circular(18);
+        final rrect = RRect.fromRectAndRadius(guideRect, radius);
+        canvas.drawRRect(rrect, fillPaint);
+        canvas.drawRRect(rrect, strokePaint);
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant PlateGuidePainter oldDelegate) {
+    return oldDelegate.shape != shape || oldDelegate.color != color;
+  }
+}
 
 class CornerBorderPainter extends CustomPainter {
   final Color color;
@@ -82,6 +137,15 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   File? _selectedImage;
   bool _isAnalyzing = false;
   final ImagePicker _imagePicker = ImagePicker();
+  PlateGuideShape _selectedPlateShape = PlateGuideShape.circle;
+  List<Map<String, dynamic>> _predictions = [];
+  String? _errorMessage;
+
+  static const Map<PlateGuideShape, String> _shapeLabel = {
+    PlateGuideShape.circle: 'Circle plate',
+    PlateGuideShape.oval: 'Oval plate',
+    PlateGuideShape.rectangle: 'Rectangle plate',
+  };
 
   void _showImageSourceOptions() {
     showModalBottomSheet(
@@ -197,17 +261,18 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       final pickedFile =
           await _imagePicker.pickImage(source: ImageSource.camera);
       if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
         setState(() {
-          _selectedImage = File(pickedFile.path);
-          _isAnalyzing = true;
+          _selectedImage = imageFile;
+          _errorMessage = null;
+          _predictions = [];
         });
-        // Simulate analysis delay
-        await Future.delayed(const Duration(seconds: 2));
-        setState(() {
-          _isAnalyzing = false;
-        });
+        await _analyzeImage(imageFile);
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -219,21 +284,192 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       final pickedFile =
           await _imagePicker.pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
+        final imageFile = File(pickedFile.path);
         setState(() {
-          _selectedImage = File(pickedFile.path);
-          _isAnalyzing = true;
+          _selectedImage = imageFile;
+          _errorMessage = null;
+          _predictions = [];
         });
-        // Simulate analysis delay
-        await Future.delayed(const Duration(seconds: 2));
-        setState(() {
-          _isAnalyzing = false;
-        });
+        await _analyzeImage(imageFile);
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     }
+  }
+
+  Future<void> _analyzeImage(File imageFile) async {
+    setState(() {
+      _isAnalyzing = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final url = Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.foodRecognizeEndpoint}');
+      final request = http.MultipartRequest('POST', url)
+        ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+      final streamedResponse = await request.send();
+      final responseBody = await streamedResponse.stream.bytesToString();
+
+      if (streamedResponse.statusCode < 200 ||
+          streamedResponse.statusCode >= 300) {
+        throw Exception(
+            'Recognition failed (${streamedResponse.statusCode}): $responseBody');
+      }
+
+      final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+      final predictions = (decoded['predictions'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _predictions = predictions;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildPredictionCard(Map<String, dynamic> prediction) {
+    final label = (prediction['label'] ?? 'Unknown').toString();
+    final confidence = (prediction['confidence'] as num?)?.toDouble() ?? 0;
+    final foodItem = prediction['food_item'] as Map<String, dynamic>?;
+    final calories = foodItem?['calories'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primaryGreen,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Confidence: ${(confidence * 100).toStringAsFixed(1)}%',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (calories != null)
+                  Text(
+                    'Calories: $calories',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlateGuideSelector() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.dinner_dining,
+            size: 20,
+            color: AppColors.primaryGreen,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Plate guide',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<PlateGuideShape>(
+              value: _selectedPlateShape,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              borderRadius: BorderRadius.circular(12),
+              items: PlateGuideShape.values
+                  .map(
+                    (shape) => DropdownMenuItem<PlateGuideShape>(
+                      value: shape,
+                      child: Text(
+                        _shapeLabel[shape]!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (shape) {
+                if (shape == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedPlateShape = shape;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -259,7 +495,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     ),
                     const SizedBox(width: 16),
                     Text(
-                      'Label',
+                      'Food Recognition',
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -289,6 +525,22 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     color: AppColors.textSecondary,
                   ),
                 ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              _buildPlateGuideSelector(),
               const SizedBox(height: 24),
               // Image frame with corner borders
               Expanded(
@@ -331,11 +583,58 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                           ),
                         ),
                       ),
+                      // Dynamic plate guide overlay
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: PlateGuidePainter(
+                              shape: _selectedPlateShape,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Guide: ${_shapeLabel[_selectedPlateShape]}',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
+              if (_predictions.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 180),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _predictions.length,
+                      itemBuilder: (context, index) =>
+                          _buildPredictionCard(_predictions[index]),
+                    ),
+                  ),
+                ),
+              if (_predictions.isNotEmpty) const SizedBox(height: 12),
               // Action button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),

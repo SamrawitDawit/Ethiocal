@@ -17,11 +17,18 @@ class AppColors {
 }
 
 class ApiConstants {
-  // Web uses localhost directly; Android emulator uses 10.0.2.2 alias.
+  // Web uses localhost directly; mobile/desktop can override with --dart-define=API_HOST.
+  // Example for physical phone on same Wi-Fi: --dart-define=API_HOST=192.168.1.42
+  static const String _apiHost = String.fromEnvironment(
+    'API_HOST',
+    defaultValue: '10.0.2.2',
+  );
+
   static String get baseUrl =>
-      kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
+      kIsWeb ? 'http://localhost:8000' : 'http://$_apiHost:8000';
   static const String registerEndpoint = '/api/v1/auth/register';
   static const String loginEndpoint = '/api/v1/auth/login';
+  static const String foodRecognizeEndpoint = '/api/v1/food/recognize';
 }
 
 class RouteNames {
