@@ -15,7 +15,6 @@ from app.db.supabase import get_supabase_admin
 # HTTPBearer extracts the token from "Authorization: Bearer <token>"
 security = HTTPBearer()
 
-
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
@@ -92,3 +91,31 @@ def require_role(allowed_roles: list[str]):
             )
         return current_user
     return role_checker
+
+
+async def get_current_auth_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    """Verify the Supabase access token and return the auth user (not the profile).
+
+    This is used when you need the raw auth user data, not the profile data.
+    """
+    token = credentials.credentials
+    supabase = get_supabase_admin()
+
+    try:
+        # Supabase auth.get_user() validates the JWT and returns the auth user
+        auth_response = supabase.auth.get_user(token)
+        auth_user = auth_response.user
+
+        if auth_user is None:
+            raise ValueError("No user returned")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+        )
+
+    return {"id": str(auth_user.id), "email": auth_user.email}
+
+    

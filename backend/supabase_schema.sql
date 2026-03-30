@@ -426,3 +426,103 @@ insert into public.food_items (name, name_amharic, category, calories_per_servin
     ('Ful', 'ፉል', 'legume', 220, 13.0, 28.0, 6.0, 8.0, 200.0, 'ful', 'manual'),
     ('Genfo', 'ገንፎ', 'porridge', 280, 8.0, 48.0, 6.0, 3.0, 200.0, 'genfo', 'manual')
 on conflict (ai_label) do nothing;
+
+
+-- =============================================
+-- 8. User Profile Table
+-- =============================================
+create table if not exists public.user_profile (
+    id          uuid primary key default gen_random_uuid(), -- profileId
+    user_id     uuid references auth.users(id) on delete cascade not null unique, -- userId
+
+    -- Health conditions
+    has_diabetes       boolean default false,
+    has_hypertension   boolean default false,
+    has_heart_disease  boolean default false,
+
+    -- Physical Metrics (New)
+    age                int check (age > 0),
+    gender             text check (gender in ('Male', 'Female')),
+    height             float check (height > 0),
+    height_unit        text check (height_unit in ('cm', 'ft')),
+    weight             float check (weight > 0),
+    weight_unit        text check (weight_unit in ('kg', 'lbs')),
+    activity_level     text check (activity_level in ('Sedentary', 'Light Active', 'Moderately Active', 'Very Active')),
+    -- make sure to add height and weight units so we can standardize to metric for calorie calculations
+    -- make sure to add height and weight units so we can standardize to metric for calorie calculations
+
+    -- Calorie tracking
+    daily_calorie_goal float,
+    created_at  timestamptz default now(),
+    updated_at  timestamptz default now()
+);
+
+alter table public.user_profile enable row level security;
+
+drop policy if exists "Users can view own profile" on public.user_profile;
+create policy "Users can view own profile"
+    on public.user_profile for select
+    using (auth.uid() = user_id);
+
+drop policy if exists "Users can update own profile" on public.user_profile;
+create policy "Users can update own profile"
+    on public.user_profile for update
+    using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert own profile" on public.user_profile;
+create policy "Users can insert own profile"
+    on public.user_profile for insert
+    with check (auth.uid() = user_id);
+
+-- =============================================
+-- 9. Health Condition Table
+-- =============================================
+
+create table if not exists public.health_condition (
+    id                   uuid primary key default gen_random_uuid(),
+    condition_name       text not null unique,
+    restricted_nutrients text check (restricted_nutrients in ('Sugar', 'Sodium', 'Fat', 'Cholesterol')),
+    threshold_amount     float check (threshold_amount > 0),
+    threshold_unit       text check (threshold_unit in ('mg', 'g', 'kcal')),
+    created_at           timestamptz default now()
+);
+
+alter table public.health_condition enable row level security;
+drop policy if exists "Allow all authenticated users to read conditions" on public.health_condition;
+create policy "Allow all authenticated users to read conditions" on public.health_condition for select to authenticated using (true);
+drop policy if exists "Admin only insert" on public.health_condition;
+create policy "Admin only insert" on public.health_condition for insert with check (true); -- TODO: This should be restricted to admin roles
+
+-- =============================================
+-- 9.1 User Profile - Health Conditions Junction
+-- =============================================
+
+-- Drop the table to ensure it's created with the correct foreign key.
+-- This is a destructive action but guarantees the schema matches the file.
+DROP TABLE IF EXISTS public.profile_health_conditions CASCADE;
+
+create table if not exists public.profile_health_conditions (
+    profile_id   uuid references public.user_profile(id) on delete cascade,
+    condition_id uuid references public.health_condition(id) on delete cascade,
+    primary key (profile_id, condition_id)
+);
+
+alter table public.profile_health_conditions enable row level security;
+
+drop policy if exists "Users can view own relations" on public.profile_health_conditions;
+create policy "Users can view own relations" on public.profile_health_conditions
+    for select using (
+        auth.uid() = (select user_id from public.user_profile where id = profile_id)
+    );
+
+drop policy if exists "Users can modify own relations" on public.profile_health_conditions;
+create policy "Users can modify own relations" on public.profile_health_conditions
+    for insert with check (
+        auth.uid() = (select user_id from public.user_profile where id = profile_id)
+    );
+
+drop policy if exists "Users can delete own relations" on public.profile_health_conditions;
+create policy "Users can delete own relations" on public.profile_health_conditions
+    for delete using (
+        auth.uid() = (select user_id from public.user_profile where id = profile_id)
+    );

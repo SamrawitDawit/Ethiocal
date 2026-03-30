@@ -55,7 +55,7 @@ class _SignUpPageState extends State<SignUpPage> {
             duration: Duration(seconds: 5),
           ),
         );
-        Navigator.pushReplacementNamed(context, RouteNames.login);
+        Navigator.pushReplacementNamed(context, RouteNames.profileSetupStep1);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -63,7 +63,7 @@ class _SignUpPageState extends State<SignUpPage> {
             backgroundColor: AppColors.primaryGreen,
           ),
         );
-        Navigator.pushReplacementNamed(context, RouteNames.home);
+        Navigator.pushReplacementNamed(context, RouteNames.profileSetupStep1);
       }
     } on ApiException catch (e) {
       if (!mounted) return;

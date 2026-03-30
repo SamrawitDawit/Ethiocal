@@ -36,6 +36,12 @@ class ApiConstants {
   static const String foodEndpoint = '/api/v1/food';
   static const String ingredientsEndpoint = '/api/v1/food/ingredients';
   static const String foodRecognizeEndpoint = '/api/v1/food/recognize';
+
+  //User Profile Endpoints
+  static const String profileEndpoint = '/api/v1/profile/';
+
+  //Health Condition Endpoints
+  static const String healthEndpoint = '/api/v1/health/';
 }
 
 class RouteNames {
@@ -45,4 +51,7 @@ class RouteNames {
   static const String home = '/home';
   static const String mealEntry = '/meal-entry';
   static const String profileSetup = '/profile-setup';
+  static const String profileSetupStep1 = '/profile-setup/step1';
+  static const String profileSetupStep2 = '/profile-setup/step2';
+  static const String profileSetupStep3 = '/profile-setup/step3';
 }
