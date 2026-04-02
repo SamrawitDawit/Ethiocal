@@ -55,7 +55,8 @@ class AppBackground extends StatelessWidget {
             right: 30,
             child: _blob(40, AppColors.lightGreen.withOpacity(0.12)),
           ),
-          child,
+          // Make child fill the entire stack
+          Positioned.fill(child: child),
         ],
       ),
     );

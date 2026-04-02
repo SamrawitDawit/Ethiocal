@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # --- AI Food Recognition ---
     AI_MODEL_API_URL: str = ""
     AI_MODEL_API_KEY: str = ""
+    YOLO_MODEL_PATH: str = "app/models/best.pt"  # Path to YOLOv8 segmentation model
+    YOLO_CONFIDENCE_THRESHOLD: float = 0.25  # Minimum confidence for detections
 
     model_config = {
         "env_file": ".env",

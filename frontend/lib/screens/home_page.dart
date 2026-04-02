@@ -153,9 +153,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icons.camera_alt,
                 label: 'Capture Food',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Coming soon!')),
-                  );
+                  Navigator.pushNamed(context, RouteNames.foodRecognition);
                 },
               ),
             ),

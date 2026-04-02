@@ -10,6 +10,7 @@ import 'screens/profile_setup_step1.dart';
 import 'screens/profile_setup_step2.dart';
 import 'screens/profile_setup_step3.dart';
 import 'providers/profile_setup_provider.dart';
+import 'screens/food_recognition_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,7 @@ class EthioCalApp extends StatelessWidget {
           RouteNames.profileSetupStep1: (context) => const ProfileSetupStep1(),
           RouteNames.profileSetupStep2: (context) => const ProfileSetupStep2(),
           RouteNames.profileSetupStep3: (context) => const ProfileSetupStep3(),
+          RouteNames.foodRecognition: (context) => const FoodRecognitionPage(),
         },
       ),
     );
