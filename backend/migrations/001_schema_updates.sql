@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.food_item_ingredients (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     food_item_id    uuid NOT NULL REFERENCES public.food_items(id) ON DELETE CASCADE,
     ingredient_id   uuid NOT NULL REFERENCES public.ingredients(id) ON DELETE CASCADE,
-    standard_quantity float NOT NULL DEFAULT 1.0,
+    quantity_grams float NOT NULL DEFAULT 1.0,
     created_at      timestamptz DEFAULT now(),
     UNIQUE(food_item_id, ingredient_id)
 );
@@ -109,19 +109,19 @@ CREATE POLICY "Admins can manage food item ingredients"
 -- after getting the actual UUIDs from your database.
 -- This is a template showing the structure:
 
--- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, standard_quantity)
+-- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, quantity_grams)
 -- SELECT f.id, i.id, 2.0  -- 2 servings of ingredient
 -- FROM public.food_items f, public.ingredients i
 -- WHERE f.ai_label = 'doro_wot' AND i.name = 'Niter Kibbeh'
 -- ON CONFLICT DO NOTHING;
 
--- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, standard_quantity)
+-- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, quantity_grams)
 -- SELECT f.id, i.id, 3.0  -- 3 servings of onion
 -- FROM public.food_items f, public.ingredients i
 -- WHERE f.ai_label = 'doro_wot' AND i.name = 'Onion'
 -- ON CONFLICT DO NOTHING;
 
--- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, standard_quantity)
+-- INSERT INTO public.food_item_ingredients (food_item_id, ingredient_id, quantity_grams)
 -- SELECT f.id, i.id, 2.0  -- 2 servings of berbere
 -- FROM public.food_items f, public.ingredients i
 -- WHERE f.ai_label = 'doro_wot' AND i.name = 'Berbere'

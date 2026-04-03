@@ -72,7 +72,7 @@ async def create_meal(
     total_calories = 0.0
     for item in payload.food_items:
         food = food_map[item.food_item_id]
-        total_calories += item.quantity * food["calories_per_serving"]
+        total_calories += item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
 
     # Create the meal
     meal_result = (
@@ -91,7 +91,7 @@ async def create_meal(
     food_items_response = []
     for item in payload.food_items:
         food = food_map[item.food_item_id]
-        item_calories = item.quantity * food["calories_per_serving"]
+        item_calories = item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
 
         item_result = (
             supabase.table("meal_food_items")
@@ -207,7 +207,7 @@ async def add_ingredients_to_meal(
             ing_id = std["ingredient_id"]
             food_qty = food_item_quantities.get(std["food_item_id"], 1.0)
             # Standard quantity is scaled by how many servings of the food
-            std_qty = std["standard_quantity"] * food_qty
+            std_qty = std["quantity_grams"] * food_qty
             if ing_id in standard_ingredients:
                 standard_ingredients[ing_id] += std_qty
             else:
@@ -226,7 +226,7 @@ async def add_ingredients_to_meal(
         quantity_difference = user_quantity - standard_qty
 
         # Calories are based on the difference, which can be negative (used less than standard)
-        ing_calories = quantity_difference * ingredient["calories_per_serving"]
+        ing_calories = quantity_difference / 100.0 * ingredient["calories_per_100g"]
         added_calories += ing_calories
 
         ing_insert_result = (

@@ -47,7 +47,7 @@ class FoodItem {
       standardServingSize:
           (json['standard_serving_size'] as num?)?.toDouble() ?? 100.0,
       caloriesPerServing:
-          (json['calories_per_serving'] as num?)?.toDouble() ?? 0.0,
+          (json['calories_per_100g'] as num?)?.toDouble() ?? 0.0,
       carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
       protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
       fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
@@ -96,7 +96,7 @@ class Ingredient {
       standardServingSize:
           (json['standard_serving_size'] as num?)?.toDouble() ?? 10.0,
       caloriesPerServing:
-          (json['calories_per_serving'] as num?)?.toDouble() ?? 0.0,
+          (json['calories_per_100g'] as num?)?.toDouble() ?? 0.0,
       carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
       protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
       fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
@@ -154,7 +154,7 @@ class FoodItemIngredient {
       id: json['id'],
       foodItemId: json['food_item_id'],
       ingredientId: json['ingredient_id'],
-      standardQuantity: (json['standard_quantity'] as num?)?.toDouble() ?? 1.0,
+      standardQuantity: (json['quantity_grams'] as num?)?.toDouble() ?? 1.0,
       ingredient: json['ingredient'] != null
           ? Ingredient.fromJson(json['ingredient'])
           : null,

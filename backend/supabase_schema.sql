@@ -139,7 +139,7 @@ create table if not exists public.food_items (
     description             text,
     category                text,
     standard_serving_size   float default 100.0,
-    calories_per_serving    float not null,
+    calories_per_100g    float not null,
     carbohydrates           float default 0.0,
     protein                 float default 0.0,
     fat                     float default 0.0,
@@ -182,7 +182,7 @@ create table if not exists public.ingredients (
     name_amharic            text,
     category                text,
     standard_serving_size   float default 10.0,
-    calories_per_serving    float not null,
+    calories_per_100g    float not null,
     carbohydrates           float default 0.0,
     protein                 float default 0.0,
     fat                     float default 0.0,
@@ -197,7 +197,7 @@ create policy "Authenticated users can read ingredients"
     using (true);
 
 -- Seed common Ethiopian cooking ingredients
-insert into public.ingredients (name, name_amharic, category, standard_serving_size, calories_per_serving, carbohydrates, protein, fat) values
+insert into public.ingredients (name, name_amharic, category, standard_serving_size, calories_per_100g, carbohydrates, protein, fat) values
     ('Vegetable Oil', 'የአትክልት ዘይት', 'oil', 15.0, 120, 0, 0, 14),
     ('Niter Kibbeh', 'ንጥር ቅቤ', 'oil', 15.0, 130, 0, 0, 15),
     ('Onion', 'ሽንኩርት', 'vegetable', 50.0, 20, 5, 0.5, 0),
@@ -222,7 +222,7 @@ create table if not exists public.food_item_ingredients (
     id              uuid primary key default gen_random_uuid(),
     food_item_id    uuid not null references public.food_items(id) on delete cascade,
     ingredient_id   uuid not null references public.ingredients(id) on delete cascade,
-    standard_quantity float not null default 1.0,
+    quantity_grams float not null default 1.0,
     created_at      timestamptz default now(),
     unique(food_item_id, ingredient_id)
 );
@@ -409,7 +409,7 @@ create policy "Public read access for food images"
 -- 12. Sample Ethiopian food data (seed)
 -- =============================================
 
-insert into public.food_items (name, name_amharic, category, calories_per_serving, protein, carbohydrates, fat, fiber, standard_serving_size, ai_label, source) values
+insert into public.food_items (name, name_amharic, category, calories_per_100g, protein, carbohydrates, fat, fiber, standard_serving_size, ai_label, source) values
     ('Doro Wot', 'ዶሮ ወጥ', 'wot', 350, 28.0, 15.0, 18.0, 3.0, 250.0, 'doro_wot', 'manual'),
     ('Injera', 'እንጀራ', 'bread', 125, 4.0, 24.0, 1.0, 2.5, 100.0, 'injera', 'manual'),
     ('Shiro Wot', 'ሽሮ ወጥ', 'wot', 280, 16.0, 32.0, 8.0, 8.0, 200.0, 'shiro_wot', 'manual'),

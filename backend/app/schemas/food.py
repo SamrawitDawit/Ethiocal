@@ -19,7 +19,7 @@ class FoodItemCreate(BaseModel):
     description: str | None = None
     category: str | None = None
     standard_serving_size: float = 100.0
-    calories_per_serving: float
+    calories_per_100g: float
     carbohydrates: float = 0.0
     protein: float = 0.0
     fat: float = 0.0
@@ -38,7 +38,7 @@ class FoodItemUpdate(BaseModel):
     description: str | None = None
     category: str | None = None
     standard_serving_size: float | None = None
-    calories_per_serving: float | None = None
+    calories_per_100g: float | None = None
     carbohydrates: float | None = None
     protein: float | None = None
     fat: float | None = None
@@ -54,7 +54,7 @@ class FoodItemResponse(BaseModel):
     description: str | None = None
     category: str | None = None
     standard_serving_size: float
-    calories_per_serving: float
+    calories_per_100g: float
     carbohydrates: float
     protein: float
     fat: float
