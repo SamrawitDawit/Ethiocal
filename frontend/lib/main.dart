@@ -6,11 +6,15 @@ import 'screens/sign_up_page.dart';
 import 'screens/login_page.dart';
 import 'screens/home_page.dart';
 import 'screens/meal_entry_page.dart';
+import 'screens/main_navigation.dart';
+import 'screens/history_page.dart';
+import 'screens/profile_page.dart';
+import 'screens/food_recognition_page.dart';
+import 'screens/stats_page.dart';
 import 'screens/profile_setup_step1.dart';
 import 'screens/profile_setup_step2.dart';
 import 'screens/profile_setup_step3.dart';
 import 'providers/profile_setup_provider.dart';
-import 'screens/food_recognition_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,11 +42,15 @@ class EthioCalApp extends StatelessWidget {
           RouteNames.signUp: (context) => const SignUpPage(),
           RouteNames.login: (context) => const LoginPage(),
           RouteNames.home: (context) => const HomePage(),
+          RouteNames.mainNavigation: (context) => const MainNavigation(),
           RouteNames.mealEntry: (context) => const MealEntryPage(),
           RouteNames.profileSetupStep1: (context) => const ProfileSetupStep1(),
           RouteNames.profileSetupStep2: (context) => const ProfileSetupStep2(),
           RouteNames.profileSetupStep3: (context) => const ProfileSetupStep3(),
           RouteNames.foodRecognition: (context) => const FoodRecognitionPage(),
+          RouteNames.history: (context) => const HistoryPage(),
+          RouteNames.profile: (context) => const ProfilePage(),
+          RouteNames.stats: (context) => const StatsPage(),
         },
       ),
     );

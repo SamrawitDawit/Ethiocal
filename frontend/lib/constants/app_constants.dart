@@ -28,17 +28,16 @@ class ApiConstants {
   // User endpoints
   static const String setupProfileEndpoint = '/api/v1/users/setup-profile';
   static const String meEndpoint = '/api/v1/users/me';
+  static const String profileEndpoint = '/api/v1/users/';
 
   // Meal endpoints
   static const String mealsEndpoint = '/api/v1/meals';
+  static const String mealFoodItemsEndpoint = '/api/v1/meal-food-items';
 
   // Food endpoints
   static const String foodEndpoint = '/api/v1/food';
   static const String ingredientsEndpoint = '/api/v1/food/ingredients';
   static const String foodRecognizeEndpoint = '/api/v1/food/recognize';
-
-  //User Profile Endpoints
-  static const String profileEndpoint = '/api/v1/profile/';
 
   //Health Condition Endpoints
   static const String healthEndpoint = '/api/v1/health/';
@@ -49,10 +48,14 @@ class RouteNames {
   static const String signUp = '/sign-up';
   static const String login = '/login';
   static const String home = '/home';
+  static const String mainNavigation = '/main';
   static const String mealEntry = '/meal-entry';
   static const String profileSetup = '/profile-setup';
   static const String profileSetupStep1 = '/profile-setup/step1';
   static const String profileSetupStep2 = '/profile-setup/step2';
   static const String profileSetupStep3 = '/profile-setup/step3';
   static const String foodRecognition = '/food-recognition';
+  static const String history = '/history';
+  static const String profile = '/profile';
+  static const String stats = '/stats';
 }

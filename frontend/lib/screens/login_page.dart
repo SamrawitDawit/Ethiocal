@@ -48,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
           backgroundColor: AppColors.primaryGreen,
         ),
       );
-      Navigator.pushReplacementNamed(context, RouteNames.home);
+      Navigator.pushReplacementNamed(context, RouteNames.mainNavigation);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

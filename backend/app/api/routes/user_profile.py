@@ -13,7 +13,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     
     # Fetch profile with health conditions through the junction table
     result = supabase.table("user_profile")\
-        .select("*, health_conditions:profile_health_conditions(condition:health_conditions(*))")\
+        .select("*, health_conditions:profile_health_conditions(condition:health_conditions(*)), daily_calorie_goal")\
         .eq("user_id", user_id)\
         .single()\
         .execute()
