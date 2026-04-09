@@ -305,83 +305,6 @@ async def get_meal_history(
     return meals
 
 
-@router.get("/{meal_id}", response_model=MealResponse)
-async def get_meal(
-    meal_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Get a single meal by ID."""
-    supabase = get_supabase_admin()
-
-    meal_result = (
-        supabase.table("meals")
-        .select("*")
-        .eq("id", meal_id)
-        .eq("user_id", current_user["id"])
-        .maybe_single()
-        .execute()
-    )
-
-    if not meal_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Meal not found.",
-        )
-
-    meal = meal_result.data
-
-    # Get food items
-    food_items_result = (
-        supabase.table("meal_food_items")
-        .select("*, food_item:food_items(*)")
-        .eq("meal_id", meal_id)
-        .execute()
-    )
-
-    # Get ingredients
-    ingredients_result = (
-        supabase.table("meal_ingredients")
-        .select("*, ingredient:ingredients(*)")
-        .eq("meal_id", meal_id)
-        .execute()
-    )
-
-    meal["food_items"] = food_items_result.data
-    meal["ingredients"] = ingredients_result.data
-
-    return meal
-
-
-@router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_meal(
-    meal_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Delete a meal."""
-    supabase = get_supabase_admin()
-
-    # Verify meal exists and belongs to user
-    meal_result = (
-        supabase.table("meals")
-        .select("id")
-        .eq("id", meal_id)
-        .eq("user_id", current_user["id"])
-        .maybe_single()
-        .execute()
-    )
-
-    if not meal_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Meal not found.",
-        )
-
-    # Delete cascades to meal_food_items and meal_ingredients
-    supabase.table("meals").delete().eq("id", meal_id).execute()
-
-
-router = APIRouter()
-
 @router.get("/meal-food-items")
 async def get_meal_food_items_by_date(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
@@ -467,3 +390,78 @@ async def get_meal_food_items_by_date(
         print(f"UNEXPECTED ERROR: {str(e)}")
         print(traceback.format_exc())
         return {"meal_food_items": [], "error": f"Unexpected error: {str(e)}"}
+
+
+@router.get("/{meal_id}", response_model=MealResponse)
+async def get_meal(
+    meal_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a single meal by ID."""
+    supabase = get_supabase_admin()
+
+    meal_result = (
+        supabase.table("meals")
+        .select("*")
+        .eq("id", meal_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    if not meal_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meal not found.",
+        )
+
+    meal = meal_result.data
+
+    # Get food items
+    food_items_result = (
+        supabase.table("meal_food_items")
+        .select("*, food_item:food_items(*)")
+        .eq("meal_id", meal_id)
+        .execute()
+    )
+
+    # Get ingredients
+    ingredients_result = (
+        supabase.table("meal_ingredients")
+        .select("*, ingredient:ingredients(*)")
+        .eq("meal_id", meal_id)
+        .execute()
+    )
+
+    meal["food_items"] = food_items_result.data
+    meal["ingredients"] = ingredients_result.data
+
+    return meal
+
+
+@router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_meal(
+    meal_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a meal."""
+    supabase = get_supabase_admin()
+
+    # Verify meal exists and belongs to user
+    meal_result = (
+        supabase.table("meals")
+        .select("id")
+        .eq("id", meal_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    if not meal_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meal not found.",
+        )
+
+    # Delete cascades to meal_food_items and meal_ingredients
+    supabase.table("meals").delete().eq("id", meal_id).execute()
