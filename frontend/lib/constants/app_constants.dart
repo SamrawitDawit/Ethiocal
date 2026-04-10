@@ -41,6 +41,11 @@ class ApiConstants {
 
   //Health Condition Endpoints
   static const String healthEndpoint = '/api/v1/health/';
+  static const String healthEvaluateFoodEndpoint =
+      '/api/v1/health/evaluate-food';
+  static const String healthDailySummaryEndpoint =
+      '/api/v1/health/daily-summary';
+  static const String healthHistoryEndpoint = '/api/v1/health/history';
 }
 
 class RouteNames {

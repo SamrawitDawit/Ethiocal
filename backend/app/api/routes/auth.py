@@ -53,27 +53,46 @@ async def register(payload: UserCreate):
     admin = get_supabase_admin()
 
     # Check if profile was created by trigger, if not create it manually
-    profile_result = (
-        admin.table("profiles")
-        .select("*")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    profile = None
+    try:
+        profile_result = (
+            admin.table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read profile after signup: {str(e)}",
+        )
 
-    if profile_result.data:
+    if profile_result is not None and getattr(profile_result, "data", None):
         profile = profile_result.data
     else:
         # Create profile manually if trigger didn't run
-        insert_result = (
-            admin.table("profiles")
-            .insert({
-                "id": user_id,
-                "email": payload.email,
-                "full_name": payload.full_name,
-            })
-            .execute()
-        )
+        try:
+            insert_result = (
+                admin.table("profiles")
+                .insert({
+                    "id": user_id,
+                    "email": payload.email,
+                    "full_name": payload.full_name,
+                })
+                .execute()
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create profile row after signup: {str(e)}",
+            )
+
+        if not insert_result or not getattr(insert_result, "data", None):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Signup succeeded, but profile row could not be created.",
+            )
         profile = insert_result.data[0]
 
     # Handle case where email confirmation is required (session will be None)

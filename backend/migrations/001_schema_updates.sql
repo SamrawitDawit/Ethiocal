@@ -22,7 +22,9 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS age integer CHECK (age > 0 OR age IS NULL),
   ADD COLUMN IF NOT EXISTS gender text CHECK (gender IN ('Male', 'Female') OR gender IS NULL),
   ADD COLUMN IF NOT EXISTS height float CHECK (height > 0 OR height IS NULL),
+  ADD COLUMN IF NOT EXISTS height_unit text CHECK (height_unit IN ('cm', 'ft') OR height_unit IS NULL),
   ADD COLUMN IF NOT EXISTS weight float CHECK (weight > 0 OR weight IS NULL),
+  ADD COLUMN IF NOT EXISTS weight_unit text CHECK (weight_unit IN ('kg', 'lbs') OR weight_unit IS NULL),
   ADD COLUMN IF NOT EXISTS activity_level text CHECK (activity_level IN ('Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active') OR activity_level IS NULL),
   ADD COLUMN IF NOT EXISTS daily_calorie_goal float DEFAULT 2000.0;
 

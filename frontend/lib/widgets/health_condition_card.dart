@@ -21,7 +21,9 @@ class HealthConditionCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: condition.isSelected ? AppColors.primaryGreen : AppColors.cardFill,
+          color: condition.isSelected
+              ? AppColors.primaryGreen
+              : AppColors.cardFill,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: condition.isSelected
@@ -73,7 +75,7 @@ class HealthConditionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Restricted: ${condition.restrictedNutrients}',
+                    'Restricted: ${condition.restrictedNutrient}',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
@@ -90,9 +92,7 @@ class HealthConditionCard extends StatelessWidget {
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: condition.isSelected
-                    ? Colors.white
-                    : Colors.transparent,
+                color: condition.isSelected ? Colors.white : Colors.transparent,
                 border: Border.all(
                   color: condition.isSelected
                       ? Colors.white

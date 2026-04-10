@@ -1,15 +1,15 @@
 class HealthCondition {
   final String id;
   final String conditionName;
-  final String restrictedNutrients;
-  final int thresholdAmount;
+  final String restrictedNutrient;
+  final double thresholdAmount;
   final String thresholdUnit;
   bool isSelected;
 
   HealthCondition({
     required this.id,
     required this.conditionName,
-    required this.restrictedNutrients,
+    required this.restrictedNutrient,
     required this.thresholdAmount,
     required this.thresholdUnit,
     this.isSelected = false,
@@ -19,8 +19,10 @@ class HealthCondition {
     return HealthCondition(
       id: json['id'],
       conditionName: json['condition_name'],
-      restrictedNutrients: json['restricted_nutrients'],
-      thresholdAmount: json['threshold_amount'],
+      restrictedNutrient:
+          (json['restricted_nutrient'] ?? json['restricted_nutrients'] ?? '')
+              .toString(),
+      thresholdAmount: (json['threshold_amount'] as num?)?.toDouble() ?? 0.0,
       thresholdUnit: json['threshold_unit'],
     );
   }
@@ -29,7 +31,7 @@ class HealthCondition {
     return {
       'id': id,
       'condition_name': conditionName,
-      'restricted_nutrients': restrictedNutrients,
+      'restricted_nutrient': restrictedNutrient,
       'threshold_amount': thresholdAmount,
       'threshold_unit': thresholdUnit,
     };
@@ -38,15 +40,15 @@ class HealthCondition {
   HealthCondition copyWith({
     String? id,
     String? conditionName,
-    String? restrictedNutrients,
-    int? thresholdAmount,
+    String? restrictedNutrient,
+    double? thresholdAmount,
     String? thresholdUnit,
     bool? isSelected,
   }) {
     return HealthCondition(
       id: id ?? this.id,
       conditionName: conditionName ?? this.conditionName,
-      restrictedNutrients: restrictedNutrients ?? this.restrictedNutrients,
+      restrictedNutrient: restrictedNutrient ?? this.restrictedNutrient,
       thresholdAmount: thresholdAmount ?? this.thresholdAmount,
       thresholdUnit: thresholdUnit ?? this.thresholdUnit,
       isSelected: isSelected ?? this.isSelected,

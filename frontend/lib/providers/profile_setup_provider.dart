@@ -165,6 +165,7 @@ class ProfileSetupProvider extends ChangeNotifier {
       await ProfileService.createProfile(profile: profile);
     } catch (e) {
       _submitError = e.toString();
+      rethrow;
     } finally {
       _isSubmitting = false;
       notifyListeners();

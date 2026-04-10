@@ -30,25 +30,62 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  bool _isProfileComplete(Map<String, dynamic> profile) {
+    return profile['age'] != null &&
+        profile['gender'] != null &&
+        profile['height'] != null &&
+        profile['height_unit'] != null &&
+        profile['weight'] != null &&
+        profile['weight_unit'] != null &&
+        profile['activity_level'] != null;
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await AuthService.login(
+      final authResponse = await AuthService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
+      // First gate from login payload itself.
+      bool isComplete = authResponse.user.age != null &&
+          authResponse.user.gender != null &&
+          authResponse.user.height != null &&
+          authResponse.user.weight != null &&
+          authResponse.user.activityLevel != null;
+
+      // If tentatively complete, verify with full profile endpoint (includes unit fields).
+      if (isComplete) {
+        try {
+          final profile = await ApiService.get(
+            '/api/v1/user-profile/me',
+            requireAuth: true,
+          );
+          isComplete = _isProfileComplete(profile);
+        } catch (_) {
+          isComplete = false;
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
+        SnackBar(
+          content: Text(
+            isComplete
+                ? 'Login successful!'
+                : 'Login successful. Please complete your profile setup.',
+          ),
           backgroundColor: AppColors.primaryGreen,
         ),
       );
-      Navigator.pushReplacementNamed(context, RouteNames.mainNavigation);
+      Navigator.pushReplacementNamed(
+        context,
+        isComplete ? RouteNames.mainNavigation : RouteNames.profileSetupStep1,
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

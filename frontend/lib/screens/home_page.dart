@@ -31,7 +31,7 @@ class _HomePageState extends State<HomePage> {
   void _generateWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    
+
     weekDates = List.generate(7, (index) {
       return startOfWeek.add(Duration(days: index));
     });
@@ -94,7 +94,8 @@ class _HomePageState extends State<HomePage> {
                           decoration: BoxDecoration(
                             color: AppColors.error.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            border: Border.all(
+                                color: AppColors.error.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
@@ -114,7 +115,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.refresh, color: AppColors.error),
+                                icon: const Icon(Icons.refresh,
+                                    color: AppColors.error),
                                 onPressed: _refreshDashboard,
                               ),
                             ],
@@ -192,7 +194,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildDayCard(DateTime date, bool isToday) {
     final dayName = _getDayName(date.weekday);
     final dayNumber = date.day.toString();
-    
+
     return Container(
       width: 40,
       height: 60,
@@ -249,7 +251,7 @@ class _HomePageState extends State<HomePage> {
 
     final progress = todayCalories / targetCalories;
     final remainingCalories = targetCalories - todayCalories;
-    
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -385,8 +387,12 @@ class _HomePageState extends State<HomePage> {
               child: _buildActionCard(
                 icon: Icons.text_fields,
                 label: 'Text Entry',
-                onTap: () {
-                  Navigator.pushNamed(context, RouteNames.mealEntry);
+                onTap: () async {
+                  final result =
+                      await Navigator.pushNamed(context, RouteNames.mealEntry);
+                  if (result == true) {
+                    await _refreshDashboard();
+                  }
                 },
               ),
             ),
@@ -447,8 +453,8 @@ class _HomePageState extends State<HomePage> {
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
   String _getDayName(int weekday) {

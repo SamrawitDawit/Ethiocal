@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../providers/profile_setup_provider.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/health_condition_card.dart';
@@ -21,7 +22,8 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProfileSetupProvider>(context, listen: false).loadHealthConditions();
+      Provider.of<ProfileSetupProvider>(context, listen: false)
+          .loadHealthConditions();
     });
   }
 
@@ -29,6 +31,7 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
     try {
       await provider.submitProfile();
       if (mounted) {
+        final loggedIn = await AuthService.isLoggedIn();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile created successfully!'),
@@ -37,7 +40,7 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
         );
         Navigator.pushNamedAndRemoveUntil(
           context,
-          RouteNames.login,
+          loggedIn ? RouteNames.mainNavigation : RouteNames.login,
           (route) => false,
         );
       }
@@ -51,6 +54,16 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
         );
       }
     }
+  }
+
+  Future<void> _skipSetup() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      loggedIn ? RouteNames.mainNavigation : RouteNames.login,
+      (route) => false,
+    );
   }
 
   @override
@@ -90,6 +103,17 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
                     ),
                     const SizedBox(width: 20),
                     const AppLogo(),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _skipSetup,
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 40),
@@ -111,7 +135,6 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
                   ),
                 ),
                 const SizedBox(height: 32),
-
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
                     if (provider.isLoadingHealthConditions)
@@ -142,16 +165,16 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
                       children: provider.healthConditions.map((condition) {
                         return HealthConditionCard(
                           condition: condition,
-                          onTap: () => provider.toggleHealthCondition(condition.id),
+                          onTap: () =>
+                              provider.toggleHealthCondition(condition.id),
                         );
                       }).toList(),
                     );
                   },
                 ),
-
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
-                    if (!provider.isLoadingHealthConditions && 
+                    if (!provider.isLoadingHealthConditions &&
                         provider.healthConditionsError.isEmpty) {
                       return Column(
                         children: [

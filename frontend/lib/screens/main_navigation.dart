@@ -4,7 +4,6 @@ import '../constants/app_constants.dart';
 import '../screens/home_page.dart';
 import '../screens/history_page.dart';
 import '../screens/profile_page.dart';
-import '../screens/food_recognition_page.dart';
 import '../screens/stats_page.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -16,13 +15,15 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  int _homeReloadKey = 0;
+  int _historyReloadKey = 0;
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const HistoryPage(),
-    const ProfilePage(),
-    const StatsPage(),
-  ];
+  List<Widget> get _pages => [
+        HomePage(key: ValueKey('home_$_homeReloadKey')),
+        HistoryPage(key: ValueKey('history_$_historyReloadKey')),
+        const ProfilePage(),
+        const StatsPage(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +74,12 @@ class _MainNavigationState extends State<MainNavigation> {
           currentIndex: _currentIndex,
           onTap: (index) {
             setState(() {
+              if (index == 0) {
+                _homeReloadKey++;
+              }
+              if (index == 1) {
+                _historyReloadKey++;
+              }
               _currentIndex = index;
             });
           },

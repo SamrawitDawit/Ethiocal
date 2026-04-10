@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../providers/profile_setup_provider.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/custom_slider.dart';
@@ -40,9 +41,19 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
     super.dispose();
   }
 
+  Future<void> _skipSetup() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      loggedIn ? RouteNames.mainNavigation : RouteNames.login,
+      (route) => false,
+    );
+  }
+
   double _convertHeight(double value, String fromUnit, String toUnit) {
     if (fromUnit == toUnit) return value;
-    
+
     if (fromUnit == 'cm' && toUnit == 'ft') {
       return value / 30.48; // cm to feet
     } else if (fromUnit == 'ft' && toUnit == 'cm') {
@@ -53,7 +64,7 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
 
   double _convertWeight(double value, String fromUnit, String toUnit) {
     if (fromUnit == toUnit) return value;
-    
+
     if (fromUnit == 'kg' && toUnit == 'lbs') {
       return value * 2.20462; // kg to lbs
     } else if (fromUnit == 'lbs' && toUnit == 'kg') {
@@ -107,6 +118,17 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
                     ),
                     const SizedBox(width: 20),
                     const AppLogo(),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _skipSetup,
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 30),
@@ -128,7 +150,6 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
                   ),
                 ),
                 const SizedBox(height: 30),
-
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
                     return Column(
@@ -151,7 +172,7 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-Row(
+                              Row(
                                 children: [
                                   Text(
                                     'Height',
@@ -170,14 +191,21 @@ Row(
                                       option2: 'ft',
                                       selectedOption: provider.heightUnit,
                                       onOptionSelected: (unit) {
-                                        final currentValue = provider.height.toDouble();
-                                        final convertedValue = _convertHeight(currentValue, provider.heightUnit, unit);
+                                        final currentValue =
+                                            provider.height.toDouble();
+                                        final convertedValue = _convertHeight(
+                                            currentValue,
+                                            provider.heightUnit,
+                                            unit);
                                         if (unit == 'ft') {
                                           provider.setHeight(convertedValue);
-                                          _heightController.text = convertedValue.toStringAsFixed(1);
+                                          _heightController.text =
+                                              convertedValue.toStringAsFixed(1);
                                         } else {
-                                          provider.setHeight(convertedValue.roundToDouble());
-                                          _heightController.text = convertedValue.round().toString();
+                                          provider.setHeight(
+                                              convertedValue.roundToDouble());
+                                          _heightController.text =
+                                              convertedValue.round().toString();
                                         }
                                         provider.setHeightUnit(unit);
                                       },
@@ -186,13 +214,15 @@ Row(
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              
+
                               // Input Field
                               CustomTextField(
                                 controller: _heightController,
                                 hintText: 'Enter height',
                                 prefixIcon: Icons.height,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 onChanged: (value) {
                                   final height = double.tryParse(value) ?? 0;
                                   if (height > 0) {
@@ -209,13 +239,16 @@ Row(
                               // Display value
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryGreen.withOpacity(0.1),
+                                  color:
+                                      AppColors.primaryGreen.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  _formatHeight(provider.height.toDouble(), provider.heightUnit),
+                                  _formatHeight(provider.height.toDouble(),
+                                      provider.heightUnit),
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
                                     fontSize: 18,
@@ -236,10 +269,12 @@ Row(
                                 onChanged: (value) {
                                   if (provider.heightUnit == 'ft') {
                                     provider.setHeight(value);
-                                    _heightController.text = value.toStringAsFixed(1);
+                                    _heightController.text =
+                                        value.toStringAsFixed(1);
                                   } else {
                                     provider.setHeight(value.roundToDouble());
-                                    _heightController.text = value.round().toString();
+                                    _heightController.text =
+                                        value.round().toString();
                                   }
                                 },
                               ),
@@ -266,7 +301,7 @@ Row(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-Row(
+                              Row(
                                 children: [
                                   Text(
                                     'Weight',
@@ -285,11 +320,16 @@ Row(
                                       option2: 'lbs',
                                       selectedOption: provider.weightUnit,
                                       onOptionSelected: (unit) {
-                                        final currentValue = provider.weight.toDouble();
-                                        final convertedValue = _convertWeight(currentValue, provider.weightUnit, unit);
+                                        final currentValue =
+                                            provider.weight.toDouble();
+                                        final convertedValue = _convertWeight(
+                                            currentValue,
+                                            provider.weightUnit,
+                                            unit);
                                         provider.setWeight(convertedValue);
                                         provider.setWeightUnit(unit);
-                                        _weightController.text = convertedValue.toStringAsFixed(1);
+                                        _weightController.text =
+                                            convertedValue.toStringAsFixed(1);
                                       },
                                     ),
                                   ),
@@ -302,7 +342,9 @@ Row(
                                 controller: _weightController,
                                 hintText: 'Enter weight',
                                 prefixIcon: Icons.monitor_weight,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 onChanged: (value) {
                                   final weight = double.tryParse(value) ?? 0;
                                   if (weight > 0) {
@@ -315,13 +357,16 @@ Row(
                               // Display value
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryGreen.withOpacity(0.1),
+                                  color:
+                                      AppColors.primaryGreen.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  _formatWeight(provider.weight.toDouble(), provider.weightUnit),
+                                  _formatWeight(provider.weight.toDouble(),
+                                      provider.weightUnit),
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
                                     fontSize: 18,
@@ -341,7 +386,8 @@ Row(
                                 showValue: false,
                                 onChanged: (value) {
                                   provider.setWeight(value);
-                                  _weightController.text = value.toStringAsFixed(1);
+                                  _weightController.text =
+                                      value.toStringAsFixed(1);
                                 },
                               ),
                             ],
@@ -353,7 +399,8 @@ Row(
                         Center(
                           child: Container(
                             constraints: const BoxConstraints(maxWidth: 200),
-                            child: const StepIndicator(currentStep: 2, totalSteps: 3),
+                            child: const StepIndicator(
+                                currentStep: 2, totalSteps: 3),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -366,7 +413,8 @@ Row(
                             onPressed: provider.isStep2Valid()
                                 ? () {
                                     provider.nextStep();
-                                    Navigator.pushNamed(context, RouteNames.profileSetupStep3);
+                                    Navigator.pushNamed(
+                                        context, RouteNames.profileSetupStep3);
                                   }
                                 : null,
                           ),

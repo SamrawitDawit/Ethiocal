@@ -19,9 +19,6 @@ from app.schemas.meal import (
     MealAddIngredientsResponse,
     MealResponse,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
-from app.db.supabase import get_supabase_admin
-from app.core.dependencies import get_current_user
 from datetime import datetime
 import traceback
 
@@ -378,10 +375,6 @@ async def delete_meal(
 
     # Delete cascades to meal_food_items and meal_ingredients
     supabase.table("meals").delete().eq("id", meal_id).execute()
-
-
-router = APIRouter()
-
 @router.get("/meal-food-items")
 async def get_meal_food_items_by_date(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),

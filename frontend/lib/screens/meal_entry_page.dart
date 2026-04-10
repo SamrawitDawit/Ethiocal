@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 import '../models/food_model.dart';
+import '../models/health_evaluation_model.dart';
 import '../services/api_service.dart';
+import '../services/health_service.dart';
 import '../services/meal_service.dart';
 import '../widgets/app_background.dart';
 
@@ -101,6 +103,69 @@ class _MealEntryPageState extends State<MealEntryPage> {
     return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFat);
   }
 
+  double get _totalSugar {
+    return _selectedFoods.fold(
+      0.0,
+      (sum, item) => sum + (item.foodItem.sugar * item.quantity),
+    );
+  }
+
+  double get _totalSodiumMg {
+    return _selectedFoods.fold(
+      0.0,
+      (sum, item) => sum + (item.foodItem.sodiumMg * item.quantity),
+    );
+  }
+
+  double get _totalCholesterolMg {
+    return _selectedFoods.fold(
+      0.0,
+      (sum, item) => sum + (item.foodItem.cholesterolMg * item.quantity),
+    );
+  }
+
+  Future<void> _runHealthEvaluationPrecheck() async {
+    try {
+      final result = await HealthService.evaluateFood(
+        nutrients: NutrientSnapshot(
+          calories: _totalFoodCalories,
+          sugarG: _totalSugar,
+          sodiumMg: _totalSodiumMg,
+          cholesterolMg: _totalCholesterolMg,
+          fatG: _totalFat,
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (result.status == 'good') return;
+
+      final conditionWarnings = result.conditions
+          .where((c) => c.exceedsLimit || c.isCloseToLimit)
+          .map((c) => '${c.conditionName}: ${c.restrictedNutrient}')
+          .toList();
+
+      final suffix =
+          conditionWarnings.isEmpty ? '' : ' (${conditionWarnings.join(', ')})';
+
+      final message = result.status == 'warning'
+          ? 'Health warning: ${result.message}$suffix'
+          : 'Health caution: ${result.message}$suffix';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: result.status == 'warning'
+              ? Colors.orange.shade800
+              : Colors.orange.shade600,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (_) {
+      // Meal logging should not fail if advisory check fails.
+    }
+  }
+
   void _addFood(FoodItem item) {
     final existing = _selectedFoods.indexWhere((e) => e.foodItem.id == item.id);
     setState(() {
@@ -155,6 +220,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
     setState(() => _isLoading = true);
 
     try {
+      await _runHealthEvaluationPrecheck();
+
       final response = await MealService.createMeal(
         mealType: _selectedMealType,
         foodItems: _selectedFoods,

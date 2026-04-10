@@ -72,6 +72,10 @@ class Ingredient {
   final double carbohydrates;
   final double protein;
   final double fat;
+  final double fiber;
+  final double sodiumMg;
+  final double sugar;
+  final double cholesterolMg;
   final String createdAt;
 
   Ingredient({
@@ -84,6 +88,10 @@ class Ingredient {
     required this.carbohydrates,
     required this.protein,
     required this.fat,
+    this.fiber = 0.0,
+    this.sodiumMg = 0.0,
+    this.sugar = 0.0,
+    this.cholesterolMg = 0.0,
     required this.createdAt,
   });
 
@@ -100,6 +108,10 @@ class Ingredient {
       carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
       protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
       fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
+      fiber: (json['fiber'] as num?)?.toDouble() ?? 0.0,
+      sodiumMg: (json['sodium_mg'] as num?)?.toDouble() ?? 0.0,
+      sugar: (json['sugar'] as num?)?.toDouble() ?? 0.0,
+      cholesterolMg: (json['cholesterol_mg'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] ?? '',
     );
   }

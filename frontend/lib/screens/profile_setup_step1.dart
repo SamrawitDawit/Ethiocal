@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../providers/profile_setup_provider.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/custom_text_field.dart';
@@ -25,7 +26,8 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
     super.initState();
     final provider = Provider.of<ProfileSetupProvider>(context, listen: false);
     _ageController = TextEditingController(text: provider.age.toString());
-    _calorieController = TextEditingController(text: provider.dailyCalorieGoal.toString());
+    _calorieController =
+        TextEditingController(text: provider.dailyCalorieGoal.toString());
   }
 
   @override
@@ -33,6 +35,16 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
     _ageController.dispose();
     _calorieController.dispose();
     super.dispose();
+  }
+
+  Future<void> _skipSetup() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      loggedIn ? RouteNames.mainNavigation : RouteNames.login,
+      (route) => false,
+    );
   }
 
   @override
@@ -72,6 +84,17 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                     ),
                     const SizedBox(width: 20),
                     const AppLogo(),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _skipSetup,
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          color: AppColors.primaryGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 40),
@@ -145,7 +168,9 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                                 children: [
                                   GestureDetector(
                                     onTap: () {
-                                      final currentAge = int.tryParse(_ageController.text) ?? 0;
+                                      final currentAge =
+                                          int.tryParse(_ageController.text) ??
+                                              0;
                                       final newAge = currentAge + 1;
                                       _ageController.text = newAge.toString();
                                       provider.setAge(newAge);
@@ -158,8 +183,11 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                                   ),
                                   GestureDetector(
                                     onTap: () {
-                                      final currentAge = int.tryParse(_ageController.text) ?? 0;
-                                      final newAge = (currentAge > 0) ? currentAge - 1 : 0;
+                                      final currentAge =
+                                          int.tryParse(_ageController.text) ??
+                                              0;
+                                      final newAge =
+                                          (currentAge > 0) ? currentAge - 1 : 0;
                                       _ageController.text = newAge.toString();
                                       provider.setAge(newAge);
                                     },
@@ -192,7 +220,8 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                               child: GestureDetector(
                                 onTap: () => provider.setGender('Male'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   decoration: BoxDecoration(
                                     color: provider.gender == 'Male'
                                         ? AppColors.primaryGreen
@@ -223,7 +252,8 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                               child: GestureDetector(
                                 onTap: () => provider.setGender('Female'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   decoration: BoxDecoration(
                                     color: provider.gender == 'Female'
                                         ? AppColors.primaryGreen
@@ -275,11 +305,21 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                               value: provider.activityLevel,
                               isExpanded: true,
                               items: const [
-                                DropdownMenuItem(value: 'Sedentary', child: Text('Sedentary')),
-                                DropdownMenuItem(value: 'Lightly Active', child: Text('Lightly Active')),
-                                DropdownMenuItem(value: 'Moderately Active', child: Text('Moderately Active')),
-                                DropdownMenuItem(value: 'Very Active', child: Text('Very Active')),
-                                DropdownMenuItem(value: 'Extra Active', child: Text('Extra Active')),
+                                DropdownMenuItem(
+                                    value: 'Sedentary',
+                                    child: Text('Sedentary')),
+                                DropdownMenuItem(
+                                    value: 'Lightly Active',
+                                    child: Text('Lightly Active')),
+                                DropdownMenuItem(
+                                    value: 'Moderately Active',
+                                    child: Text('Moderately Active')),
+                                DropdownMenuItem(
+                                    value: 'Very Active',
+                                    child: Text('Very Active')),
+                                DropdownMenuItem(
+                                    value: 'Extra Active',
+                                    child: Text('Extra Active')),
                               ],
                               onChanged: (value) {
                                 if (value != null) {
@@ -333,7 +373,8 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                           onPressed: provider.isStep1Valid()
                               ? () {
                                   provider.nextStep();
-                                  Navigator.pushNamed(context, RouteNames.profileSetupStep2);
+                                  Navigator.pushNamed(
+                                      context, RouteNames.profileSetupStep2);
                                 }
                               : null,
                         ),

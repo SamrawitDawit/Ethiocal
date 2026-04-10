@@ -2,60 +2,59 @@ import 'api_service.dart';
 
 class DashboardService {
   static Future<Map<String, dynamic>> fetchUserDashboard() async {
-  try {
-    print('DEBUG: Fetching user profile...');
-    final profileData =
-        await ApiService.get('/api/v1/users/me', requireAuth: true);
-    print('DEBUG: Profile data: $profileData');
-
-    final dailyCalorieGoal = profileData['daily_calorie_goal'] ?? 2000;
-    print('DEBUG: Daily calorie goal: $dailyCalorieGoal');
-
-    // Try to get meal items, but don't let failure break the entire dashboard
-    int totalCalories = 0;
     try {
-      final today = DateTime.now();
-      final todayStart = DateTime(today.year, today.month, today.day);
+      final profileData = await ApiService.get(
+        '/api/v1/user-profile/me',
+        requireAuth: true,
+      );
 
-      print('DEBUG: Fetching meal items for date: ${todayStart.toIso8601String().split('T')[0]}');
-      final mealItemsData = await ApiService.get(
-        '/api/v1/meals/meal-food-items',
+      final dailyCalorieGoal = profileData['daily_calorie_goal'] ?? 2000;
+
+      final mealHistory = await ApiService.getList(
+        '/api/v1/meals',
         requireAuth: true,
         queryParams: {
-          'date': todayStart.toIso8601String().split('T')[0]
+          'skip': '0',
+          'limit': '100',
         },
       );
-      print('DEBUG: Meal items data: $mealItemsData');
 
-      if (mealItemsData['meal_food_items'] != null) {
-        final mealItems = mealItemsData['meal_food_items'] as List;
-        print('DEBUG: Processing ${mealItems.length} meal items');
-        for (final item in mealItems) {
-          if (item['total_calories'] != null) {
-            totalCalories += (item['total_calories'] as num).toInt();
-          }
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      int totalCalories = 0;
+      for (final meal in mealHistory) {
+        final createdAtRaw = meal['created_at'];
+        if (createdAtRaw == null) continue;
+
+        DateTime? createdAt;
+        try {
+          createdAt = DateTime.parse(createdAtRaw.toString()).toLocal();
+        } catch (_) {
+          continue;
+        }
+
+        if (createdAt.isAfter(
+                todayStart.subtract(const Duration(milliseconds: 1))) &&
+            createdAt.isBefore(todayEnd)) {
+          totalCalories +=
+              ((meal['total_calories'] as num?)?.toDouble() ?? 0).toInt();
         }
       }
-      print('DEBUG: Total calories: $totalCalories');
+
+      return {
+        'dailyCalorieGoal': dailyCalorieGoal,
+        'todayCalories': totalCalories,
+        'success': true,
+      };
     } catch (e) {
-      print('DEBUG: Failed to fetch meal items, using 0 calories: $e');
-      // Continue with 0 calories if meal items fetch fails
+      return {
+        'dailyCalorieGoal': 2000,
+        'todayCalories': 0,
+        'success': false,
+        'error': e.toString(),
+      };
     }
-
-    return {
-      'dailyCalorieGoal': dailyCalorieGoal,
-      'todayCalories': totalCalories,
-      'success': true,
-    };
-  } catch (e) {
-    print('ERROR in fetchUserDashboard: $e');
-    return {
-      'dailyCalorieGoal': 2000,
-      'todayCalories': 0,
-      'success': false,
-      'error': e.toString(),
-    };
   }
-}
-
 }

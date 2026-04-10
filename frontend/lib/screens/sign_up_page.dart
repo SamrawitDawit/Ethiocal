@@ -50,7 +50,8 @@ class _SignUpPageState extends State<SignUpPage> {
         // Show email confirmation message and go to login
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account created! Please check your email to verify your account.'),
+            content: Text(
+                'Account created! Please check your email to verify your account.'),
             backgroundColor: AppColors.primaryGreen,
             duration: Duration(seconds: 5),
           ),
