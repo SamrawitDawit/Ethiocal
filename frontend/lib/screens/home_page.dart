@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 import '../services/auth_service.dart';
 import '../services/dashboard_service.dart';
 import '../widgets/app_background.dart';
@@ -31,7 +33,7 @@ class _HomePageState extends State<HomePage> {
   void _generateWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    
+
     weekDates = List.generate(7, (index) {
       return startOfWeek.add(Duration(days: index));
     });
@@ -71,6 +73,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -84,9 +87,9 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
-                      _buildWeeklyCalendar(),
+                      _buildWeeklyCalendar(lang),
                       const SizedBox(height: 24),
-                      _buildTodayIntakeCard(),
+                      _buildTodayIntakeCard(lang),
                       if (errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Container(
@@ -94,11 +97,12 @@ class _HomePageState extends State<HomePage> {
                           decoration: BoxDecoration(
                             color: AppColors.error.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            border: Border.all(
+                                color: AppColors.error.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.error_outline,
                                 color: AppColors.error,
                                 size: 20,
@@ -114,7 +118,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.refresh, color: AppColors.error),
+                                icon: const Icon(Icons.refresh,
+                                    color: AppColors.error),
                                 onPressed: _refreshDashboard,
                               ),
                             ],
@@ -122,7 +127,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      _buildQuickActions(),
+                      _buildQuickActions(lang),
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -151,7 +156,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWeeklyCalendar() {
+  Widget _buildWeeklyCalendar(LanguageProvider lang) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -169,7 +174,7 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'This Week',
+            lang.t('this_week'),
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -181,7 +186,7 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: weekDates.map((date) {
               final isToday = _isSameDay(date, today);
-              return _buildDayCard(date, isToday);
+              return _buildDayCard(date, isToday, lang);
             }).toList(),
           ),
         ],
@@ -189,10 +194,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDayCard(DateTime date, bool isToday) {
-    final dayName = _getDayName(date.weekday);
+  Widget _buildDayCard(DateTime date, bool isToday, LanguageProvider lang) {
+    final dayName = _getDayName(date.weekday, lang);
     final dayNumber = date.day.toString();
-    
+
     return Container(
       width: 40,
       height: 60,
@@ -226,7 +231,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTodayIntakeCard() {
+  Widget _buildTodayIntakeCard(LanguageProvider lang) {
     if (isLoading) {
       return Container(
         height: 200,
@@ -249,11 +254,11 @@ class _HomePageState extends State<HomePage> {
 
     final progress = todayCalories / targetCalories;
     final remainingCalories = targetCalories - todayCalories;
-    
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [
             AppColors.primaryGreen,
             AppColors.lightGreen,
@@ -276,12 +281,15 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Today's Intake",
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+              Flexible(
+                child: Text(
+                  lang.t('todays_intake'),
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
@@ -320,7 +328,7 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Consumed',
+                      lang.t('consumed'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: Colors.white.withOpacity(0.8),
@@ -342,7 +350,9 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      remainingCalories > 0 ? 'Remaining' : 'Over',
+                      remainingCalories > 0
+                          ? lang.t('remaining')
+                          : lang.t('over'),
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: Colors.white.withOpacity(0.8),
@@ -366,12 +376,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(LanguageProvider lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Actions',
+          lang.t('quick_actions'),
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -384,7 +394,7 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: _buildActionCard(
                 icon: Icons.text_fields,
-                label: 'Text Entry',
+                label: lang.t('text_entry'),
                 onTap: () {
                   Navigator.pushNamed(context, RouteNames.mealEntry);
                 },
@@ -394,7 +404,7 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: _buildActionCard(
                 icon: Icons.camera_alt,
-                label: 'Capture Food',
+                label: lang.t('capture_food'),
                 onTap: () {
                   Navigator.pushNamed(context, RouteNames.foodRecognition);
                 },
@@ -447,11 +457,15 @@ class _HomePageState extends State<HomePage> {
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
-  String _getDayName(int weekday) {
+  String _getDayName(int weekday, LanguageProvider lang) {
+    if (lang.isAmharic) {
+      const days = ['ሰኞ', 'ማክ', 'ረቡ', 'ሐሙ', 'ዓር', 'ቅዳ', 'እሁ'];
+      return days[weekday - 1];
+    }
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[weekday - 1];
   }

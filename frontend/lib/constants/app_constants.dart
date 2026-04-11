@@ -41,6 +41,9 @@ class ApiConstants {
 
   //Health Condition Endpoints
   static const String healthEndpoint = '/api/v1/health/';
+
+  // Notification endpoints
+  static const String notificationsEndpoint = '/api/v1/notifications';
 }
 
 class RouteNames {
@@ -58,4 +61,6 @@ class RouteNames {
   static const String history = '/history';
   static const String profile = '/profile';
   static const String stats = '/stats';
+  static const String notificationSettings = '/notification-settings';
+  static const String languageSettings = '/language-settings';
 }
