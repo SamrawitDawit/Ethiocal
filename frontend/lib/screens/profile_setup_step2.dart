@@ -63,7 +63,7 @@ class _ProfileSetupStep2State extends State<ProfileSetupStep2> {
   }
 
   String _formatHeight(double value, String unit) {
-    return '${value.toStringAsFixed(1)} $unit';
+    return '${unit == 'cm' ? value.round().toString() : value.toStringAsFixed(1)} $unit';
   }
 
   String _formatWeight(double value, String unit) {
@@ -172,13 +172,13 @@ Row(
                                       onOptionSelected: (unit) {
                                         final currentValue = provider.height.toDouble();
                                         final convertedValue = _convertHeight(currentValue, provider.heightUnit, unit);
-                                        if (unit == 'ft') {
-                                          provider.setHeight(convertedValue);
-                                          _heightController.text = convertedValue.toStringAsFixed(1);
-                                        } else {
-                                          provider.setHeight(convertedValue.roundToDouble());
-                                          _heightController.text = convertedValue.round().toString();
-                                        }
+                                        final heightValue = unit == 'ft' 
+                                          ? double.parse(convertedValue.toStringAsFixed(1))
+                                          : convertedValue.round().toDouble();
+                                        provider.setHeight(heightValue);
+                                        _heightController.text = unit == 'ft' 
+                                          ? heightValue.toStringAsFixed(1)
+                                          : heightValue.round().toString();
                                         provider.setHeightUnit(unit);
                                       },
                                     ),
@@ -196,11 +196,10 @@ Row(
                                 onChanged: (value) {
                                   final height = double.tryParse(value) ?? 0;
                                   if (height > 0) {
-                                    if (provider.heightUnit == 'ft') {
-                                      provider.setHeight(height);
-                                    } else {
-                                      provider.setHeight(height);
-                                    }
+                                    final heightValue = provider.heightUnit == 'cm' 
+                                      ? height.round().toDouble() 
+                                      : double.parse(height.toStringAsFixed(1));
+                                    provider.setHeight(heightValue);
                                   }
                                 },
                               ),
@@ -234,13 +233,13 @@ Row(
                                 unit: provider.heightUnit,
                                 showValue: false,
                                 onChanged: (value) {
-                                  if (provider.heightUnit == 'ft') {
-                                    provider.setHeight(value);
-                                    _heightController.text = value.toStringAsFixed(1);
-                                  } else {
-                                    provider.setHeight(value.roundToDouble());
-                                    _heightController.text = value.round().toString();
-                                  }
+                                  final heightValue = provider.heightUnit == 'cm' 
+                                    ? value.round().toDouble() 
+                                    : double.parse(value.toStringAsFixed(1));
+                                  provider.setHeight(heightValue);
+                                  _heightController.text = provider.heightUnit == 'cm' 
+                                    ? heightValue.round().toString() 
+                                    : heightValue.toStringAsFixed(1);
                                 },
                               ),
                             ],
@@ -353,7 +352,7 @@ Row(
                         Center(
                           child: Container(
                             constraints: const BoxConstraints(maxWidth: 200),
-                            child: const StepIndicator(currentStep: 2, totalSteps: 3),
+                            child: const StepIndicator(currentStep: 2, totalSteps: 4),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -365,8 +364,7 @@ Row(
                             text: 'Continue',
                             onPressed: provider.isStep2Valid()
                                 ? () {
-                                    provider.nextStep();
-                                    Navigator.pushNamed(context, RouteNames.profileSetupStep3);
+                                    Navigator.pushNamed(context, RouteNames.profileSetupStep2_2);
                                   }
                                 : null,
                           ),

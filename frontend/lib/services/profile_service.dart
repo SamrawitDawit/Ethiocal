@@ -16,7 +16,7 @@ class ProfileService {
     required Profile profile,
   }) async {
     try {
-      final response = await ApiService.post('/api/v1/user-profile/', profile.toJson(), requireAuth: true);
+      final response = await ApiService.patch('/api/v1/user-profile/me', profile.toJson(), requireAuth: true);
       return response;
     } catch (e) {
       throw Exception('Failed to create profile: $e');

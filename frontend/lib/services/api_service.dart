@@ -128,6 +128,41 @@ class ApiService {
     throw ApiException(errorMessage, response.statusCode);
   }
 
+  static Future<Map<String, dynamic>> put(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool requireAuth = false,
+  }) async {
+    final url = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final headers = await _getHeaders(requireAuth: requireAuth);
+    debugPrint('API PUT: $url');
+
+    final http.Response response;
+    try {
+      response = await http.put(
+        url,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+    } catch (e) {
+      debugPrint('HTTP request failed: $e');
+      rethrow;
+    }
+
+    debugPrint('API response ${response.statusCode}: ${response.body}');
+
+    final decoded = jsonDecode(response.body);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded as Map<String, dynamic>;
+    }
+
+    final errorMessage = decoded is Map && decoded.containsKey('detail')
+        ? decoded['detail']
+        : 'Something went wrong. Please try again.';
+    throw ApiException(errorMessage, response.statusCode);
+  }
+
   static Future<List<dynamic>> getList(
     String endpoint, {
     bool requireAuth = false,

@@ -1,3 +1,4 @@
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.db.supabase import get_supabase_admin
 from app.core.dependencies import get_current_user, get_current_auth_user
@@ -5,16 +6,21 @@ from app.schemas.user_profile import UserProfileUpdate, UserProfileResponse
 
 router = APIRouter()
 
+def calculate_age(birthdate: date) -> int:
+    """Helper to calculate age from birthdate."""
+    today = date.today()
+    return today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
     """Get the profile of the currently authenticated user, including health conditions."""
     supabase = get_supabase_admin()
-    user_id = current_user["user_id"] # Get the user_id (FK) from the profile row
+    user_id = current_user["id"]
     
     # Fetch profile with health conditions through the junction table
-    result = supabase.table("user_profile")\
-        .select("*, health_conditions:profile_health_conditions(condition:health_conditions(*)), daily_calorie_goal")\
-        .eq("user_id", user_id)\
+    result = supabase.table("profiles") \
+        .select("*, health_conditions:user_health_conditions(condition:health_conditions(*))")\
+        .eq("id", user_id)\
         .single()\
         .execute()
     
@@ -23,6 +29,11 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     
     # Flatten the nested structure from the join
     data = result.data
+
+    # Priority: calculate age from birthdate if available
+    if data.get("birthdate"):
+        data["age"] = calculate_age(date.fromisoformat(data["birthdate"]))
+
     data["health_conditions"] = [item["condition"] for item in data.get("health_conditions", [])]
     
     return data
@@ -33,70 +44,82 @@ async def create_my_profile(
     auth_user: dict = Depends(get_current_auth_user)
 ):
     """Create a new profile for the authenticated user."""
+    # Note: In the new schema, profiles are auto-created on signup. 
+    # This POST effectively acts as an update for those initial fields.
     supabase = get_supabase_admin()
-    user_id = auth_user["id"]  # This is the auth user ID
+    user_id = auth_user["id"]
 
-    # 1. Insert the profile data
-    profile_data = payload.model_dump(exclude={"health_condition_ids"}, exclude_unset=True)
-    profile_data["user_id"] = user_id
+    # 1. Update the profile data (since row already exists via trigger)
+    profile_data = payload.model_dump(mode='json', exclude={"health_condition_ids"}, exclude_unset=True)
 
-    result = supabase.table("user_profile").insert(profile_data).execute()
+    result = supabase.table("profiles").update(profile_data).eq("id", user_id).execute()
     
     if not result.data:
-        raise HTTPException(status_code=400, detail="Failed to create profile")
+        raise HTTPException(status_code=400, detail="Failed to setup profile")
     
-    new_profile = result.data[0]
-    profile_id = new_profile["id"]
-
     # 2. Insert health conditions if provided
     if payload.health_condition_ids:
         relations = [
-            {"profile_id": profile_id, "condition_id": str(cid)}
+            {"user_id": user_id, "health_condition_id": str(cid)}
             for cid in payload.health_condition_ids
         ]
-        supabase.table("profile_health_conditions").insert(relations).execute()
+        supabase.table("user_health_conditions").upsert(relations).execute()
 
     # 3. Return the newly created profile with health conditions
-    # Fetch the complete profile with health conditions
-    profile_result = supabase.table("user_profile")\
-        .select("*, health_conditions:profile_health_conditions(condition:health_conditions(*))")\
-        .eq("id", profile_id)\
-        .single()\
-        .execute()
-    
-    if not profile_result.data:
-        raise HTTPException(status_code=404, detail="Profile not found after creation")
-    
-    # Flatten the nested structure
-    data = profile_result.data
-    data["health_conditions"] = [item["condition"] for item in data.get("health_conditions", [])]
-    
-    return data
+    return await get_my_profile(current_user=result.data[0])
 
 @router.put("/me", response_model=UserProfileResponse)
 async def update_my_profile(payload: UserProfileUpdate, current_user: dict = Depends(get_current_user)):
     """Update profile details and health condition associations."""
     supabase = get_supabase_admin()
-    user_id = current_user["user_id"]
-    profile_id = current_user["id"] # This is the profileId (PK)
+    user_id = current_user["id"]
     
-    update_dict = payload.model_dump(exclude={"health_condition_ids"}, exclude_unset=True)
+    update_dict = payload.model_dump(mode='json', exclude={"health_condition_ids"}, exclude_unset=True)
     
     if update_dict:
-        supabase.table("user_profile").update(update_dict).eq("user_id", user_id).execute()
+        supabase.table("profiles").update(update_dict).eq("id", user_id).execute()
 
     # Handle health condition relationships if provided
     if payload.health_condition_ids is not None:
         # Clear existing relations
-        supabase.table("profile_health_conditions").delete().eq("profile_id", profile_id).execute()
+        supabase.table("user_health_conditions").delete().eq("user_id", user_id).execute()
         
         # Insert new relations
         if payload.health_condition_ids:
             new_relations = [
-                {"profile_id": profile_id, "condition_id": str(cid)} 
+                {"user_id": user_id, "health_condition_id": str(cid)} 
                 for cid in payload.health_condition_ids
             ]
-            supabase.table("profile_health_conditions").insert(new_relations).execute()
+            supabase.table("user_health_conditions").insert(new_relations).execute()
+
+    return await get_my_profile(current_user)
+
+@router.patch("/me", response_model=UserProfileResponse)
+async def patch_my_profile(payload: UserProfileUpdate, current_user: dict = Depends(get_current_user)):
+    """Partial update of profile details and health condition associations."""
+    supabase = get_supabase_admin()
+    user_id = current_user["id"]
+    
+    # extract only fields that were actually sent in the request
+    update_dict = payload.model_dump(mode='json', exclude={"health_condition_ids"}, exclude_unset=True)
+    
+    if update_dict:
+        result = supabase.table("profiles").update(update_dict).eq("id", user_id).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+    # Handle health condition relationships if the key was present in the request
+    if payload.health_condition_ids is not None:
+        # Clear existing relations for this user
+        supabase.table("user_health_conditions").delete().eq("user_id", user_id).execute()
+        
+        # Insert new relations if the list is not empty
+        if payload.health_condition_ids:
+            new_relations = [
+                {"user_id": user_id, "health_condition_id": str(cid)} 
+                for cid in payload.health_condition_ids
+            ]
+            supabase.table("user_health_conditions").insert(new_relations).execute()
 
     return await get_my_profile(current_user)
 
@@ -104,8 +127,8 @@ async def update_my_profile(payload: UserProfileUpdate, current_user: dict = Dep
 async def delete_my_profile(current_user: dict = Depends(get_current_user)):
     """Delete the authenticated user's profile."""
     supabase = get_supabase_admin()
-    user_id = current_user["user_id"]
+    user_id = current_user["id"]
     
-    supabase.table("user_profile").delete().eq("user_id", user_id).execute()
+    supabase.table("profiles").delete().eq("id", user_id).execute()
     
     return None

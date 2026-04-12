@@ -56,6 +56,7 @@ class RouteNames {
   static const String profileSetup = '/profile-setup';
   static const String profileSetupStep1 = '/profile-setup/step1';
   static const String profileSetupStep2 = '/profile-setup/step2';
+  static const String profileSetupStep2_2 = '/profile-setup/step2-2';
   static const String profileSetupStep3 = '/profile-setup/step3';
   static const String foodRecognition = '/food-recognition';
   static const String history = '/history';

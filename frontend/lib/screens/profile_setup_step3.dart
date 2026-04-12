@@ -26,9 +26,10 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
   }
 
   Future<void> _submitProfile(ProfileSetupProvider provider) async {
-    try {
-      await provider.submitProfile();
-      if (mounted) {
+    final success = await provider.submitProfile();
+    
+    if (mounted) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile created successfully!'),
@@ -40,9 +41,7 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
           RouteNames.login,
           (route) => false,
         );
-      }
-    } catch (e) {
-      if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to create profile: ${provider.submitError}'),

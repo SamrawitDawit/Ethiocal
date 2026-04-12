@@ -13,6 +13,7 @@ import 'screens/food_recognition_page.dart';
 import 'screens/stats_page.dart';
 import 'screens/profile_setup_step1.dart';
 import 'screens/profile_setup_step2.dart';
+import 'screens/profile_setup_step2_2.dart';
 import 'screens/profile_setup_step3.dart';
 import 'screens/notification_settings_page.dart';
 import 'screens/language_settings_page.dart';
@@ -62,6 +63,8 @@ class EthioCalApp extends StatelessWidget {
                   const ProfileSetupStep1(),
               RouteNames.profileSetupStep2: (context) =>
                   const ProfileSetupStep2(),
+              RouteNames.profileSetupStep2_2: (context) =>
+                  const ProfileSetupStep2_2(),
               RouteNames.profileSetupStep3: (context) =>
                   const ProfileSetupStep3(),
               RouteNames.foodRecognition: (context) =>
