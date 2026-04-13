@@ -237,9 +237,21 @@ class _HomePageState extends State<HomePage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const AppLogo(imageHeight: 28, fontSize: 18),
-          IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.textSecondary),
-            onPressed: _logout,
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.school, color: AppColors.textSecondary),
+                onPressed: () {
+                  Navigator.pushNamed(context, RouteNames.educationList);
+                },
+                tooltip: 'Education & Awareness',
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.logout, color: AppColors.textSecondary),
+                onPressed: _logout,
+              ),
+            ],
           ),
         ],
       ),

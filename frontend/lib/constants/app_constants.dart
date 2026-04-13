@@ -64,4 +64,6 @@ class RouteNames {
   static const String stats = '/stats';
   static const String notificationSettings = '/notification-settings';
   static const String languageSettings = '/language-settings';
+  static const String educationList = '/education';
+  static const String educationDetail = '/education/detail';
 }

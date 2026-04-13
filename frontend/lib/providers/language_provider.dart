@@ -131,6 +131,13 @@ class LanguageProvider extends ChangeNotifier {
     'weekly_overview': 'Weekly Overview',
     'no_data': 'No data available yet',
     'start_logging_stats': 'Start logging meals to see your statistics',
+
+    // Education & Awareness
+    'education_awareness': 'Education & Awareness',
+    'error_loading_content': 'Error loading content',
+    'no_education_content': 'No education content available',
+    'error_loading_article': 'Error loading article',
+    'article_not_found': 'Article not found',
   };
 
   // --- Amharic Strings ---
@@ -223,5 +230,12 @@ class LanguageProvider extends ChangeNotifier {
     'weekly_overview': 'ሳምንታዊ ማጠቃለያ',
     'no_data': 'ገና ምንም መረጃ የለም',
     'start_logging_stats': 'ስታቲስቲክስዎን ለማየት ምግቦችን መመዝገብ ይጀምሩ',
+
+    // Education & Awareness
+    'education_awareness': 'ትምህርት እና ግንዛቤ',
+    'error_loading_content': 'ይዘት በመጫን ላይ ስህተት ተከስቷል',
+    'no_education_content': 'ምንም የትምህርት ይዘት የለም',
+    'error_loading_article': 'ጽሑፍ በመጫን ላይ ስህተት ተከስቷል',
+    'article_not_found': 'ጽሑፍ አልተገኘም',
   };
 }

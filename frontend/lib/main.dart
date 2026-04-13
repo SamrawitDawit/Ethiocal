@@ -21,7 +21,9 @@ import 'providers/profile_setup_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/language_provider.dart';
 import 'services/local_notification_service.dart';
-
+import 'screens/education_list_page.dart';
+import 'screens/education_detail_page.dart';
+import 'providers/education_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalNotificationService.initialize();
@@ -37,6 +39,7 @@ class EthioCalApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ProfileSetupProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => EducationProvider()),
         ChangeNotifierProvider(
             create: (_) => LanguageProvider()..loadLanguage()),
       ],
@@ -76,6 +79,13 @@ class EthioCalApp extends StatelessWidget {
                   const NotificationSettingsPage(),
               RouteNames.languageSettings: (context) =>
                   const LanguageSettingsPage(),
+              RouteNames.educationList: (context) => const EducationListPage(),
+              RouteNames.educationDetail: (context) {
+                final args = ModalRoute.of(context)!.settings.arguments
+                    as Map<String, dynamic>?;
+                final articleId = args?['articleId'] as String?;
+                return EducationDetailPage(articleId: articleId ?? '');
+              },
             },
           );
         },
