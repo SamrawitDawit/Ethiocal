@@ -47,7 +47,7 @@ class _MainNavigationState extends State<MainNavigation> {
         margin: const EdgeInsets.only(top: 20),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
+         // border: Border.all(color: Colors.white, width: 4),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),

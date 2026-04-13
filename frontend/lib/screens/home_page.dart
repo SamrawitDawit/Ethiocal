@@ -7,6 +7,9 @@ import '../services/auth_service.dart';
 import '../services/dashboard_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/weekly_calendar.dart';
+import '../widgets/intake_card.dart';
+import '../widgets/quick_actions.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,20 +25,43 @@ class _HomePageState extends State<HomePage> {
   int targetCalories = 2000;
   bool isLoading = true;
   String? errorMessage;
+  Map<DateTime, Map<String, dynamic>>? historicalData;
+  DateTime? selectedDate;
+  bool isLoadingHistorical = false;
+  final ScrollController _scrollController = ScrollController();
+  Map<String, dynamic>? mealBreakdown;
+  Map<String, dynamic>? nutrientBreakdown;
 
   @override
   void initState() {
     super.initState();
     _generateWeekDates();
+    selectedDate = today; // Set today as selected by default
     _fetchDashboardData();
   }
 
   void _generateWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-
-    weekDates = List.generate(7, (index) {
-      return startOfWeek.add(Duration(days: index));
+    
+    // Generate dates for current week + 4 weeks of past dates for scrolling
+    weekDates = List.generate(35, (index) {
+      return startOfWeek.subtract(Duration(days: 28 - index));
+    });
+    
+    // Scroll to show current week initially
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        // Calculate position to show current week (days 28-34 in our list)
+        const currentWeekStartIndex = 28;
+        const itemWidth = 58.0; // 50 width + 8 padding
+        const scrollOffset = currentWeekStartIndex * itemWidth;
+        _scrollController.animateTo(
+          scrollOffset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
@@ -47,9 +73,13 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final dashboardData = await DashboardService.fetchUserDashboard();
+      final mealBreakdownData = await DashboardService.fetchMealBreakdownForDate(today);
+      final nutrientData = await DashboardService.fetchDailyNutrients(today);
       setState(() {
         targetCalories = dashboardData['dailyCalorieGoal'] ?? 2000;
         todayCalories = dashboardData['todayCalories'] ?? 0;
+        mealBreakdown = mealBreakdownData['mealBreakdown'];
+        nutrientBreakdown = nutrientData;
         isLoading = false;
       });
     } catch (e) {
@@ -64,11 +94,50 @@ class _HomePageState extends State<HomePage> {
     await _fetchDashboardData();
   }
 
+  Future<void> _onDateTapped(DateTime date) async {
+    if (date.isAfter(today) && !_isSameDay(date, today)) {
+      return; // Don't allow future dates
+    }
+
+    setState(() {
+      selectedDate = date;
+      isLoadingHistorical = true;
+    });
+
+    try {
+      final data = await DashboardService.fetchCaloriesForDate(date);
+      final mealBreakdownData = await DashboardService.fetchMealBreakdownForDate(date);
+      final nutrientData = await DashboardService.fetchDailyNutrients(date);
+      setState(() {
+        historicalData ??= {};
+        historicalData![date] = {
+          ...data,
+          'mealBreakdown': mealBreakdownData['mealBreakdown'],
+          'nutrientBreakdown': nutrientData,
+        };
+        // Always set mealBreakdown and nutrientBreakdown for the selected date (today or historical)
+        mealBreakdown = mealBreakdownData['mealBreakdown'];
+        nutrientBreakdown = nutrientData;
+        isLoadingHistorical = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingHistorical = false;
+      });
+    }
+  }
+
   Future<void> _logout() async {
     await AuthService.clearTokens();
     if (mounted) {
       Navigator.pushReplacementNamed(context, RouteNames.landing);
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -87,18 +156,39 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
-                      _buildWeeklyCalendar(lang),
+                      WeeklyCalendar(
+                        weekDates: weekDates,
+                        today: today,
+                        selectedDate: selectedDate,
+                        scrollController: _scrollController,
+                        historicalData: historicalData,
+                        onDateTapped: _onDateTapped,
+                      ),
                       const SizedBox(height: 24),
-                      _buildTodayIntakeCard(lang),
+                      IntakeCard(
+                        todayCalories: todayCalories,
+                        targetCalories: targetCalories,
+                        isLoading: isLoading,
+                        isLoadingHistorical: isLoadingHistorical,
+                        selectedDate: selectedDate,
+                        today: today,
+                        mealBreakdown: mealBreakdown,
+                        nutrientBreakdown: nutrientBreakdown,
+                        historicalData: historicalData,
+                        onBackPressed: () {
+                          setState(() {
+                            selectedDate = null;
+                          });
+                        },
+                      ),
                       if (errorMessage != null) ...[
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppColors.error.withOpacity(0.3)),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -127,7 +217,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      _buildQuickActions(lang),
+                      const QuickActions(),
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -156,317 +246,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildWeeklyCalendar(LanguageProvider lang) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardFill,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            lang.t('this_week'),
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: weekDates.map((date) {
-              final isToday = _isSameDay(date, today);
-              return _buildDayCard(date, isToday, lang);
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDayCard(DateTime date, bool isToday, LanguageProvider lang) {
-    final dayName = _getDayName(date.weekday, lang);
-    final dayNumber = date.day.toString();
-
-    return Container(
-      width: 40,
-      height: 60,
-      decoration: BoxDecoration(
-        color: isToday ? AppColors.lightGreen : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: isToday ? null : Border.all(color: AppColors.inputBorder),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            dayName,
-            style: GoogleFonts.poppins(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: isToday ? Colors.white : AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            dayNumber,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isToday ? Colors.white : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTodayIntakeCard(LanguageProvider lang) {
-    if (isLoading) {
-      return Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: AppColors.cardFill,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryGreen),
-        ),
-      );
-    }
-
-    final progress = todayCalories / targetCalories;
-    final remainingCalories = targetCalories - todayCalories;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            AppColors.primaryGreen,
-            AppColors.lightGreen,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGreen.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  lang.t('todays_intake'),
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: progress.clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lang.t('consumed'),
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                    Text(
-                      '$todayCalories kcal',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      remainingCalories > 0
-                          ? lang.t('remaining')
-                          : lang.t('over'),
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                    Text(
-                      '${remainingCalories.abs()} kcal',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(LanguageProvider lang) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          lang.t('quick_actions'),
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.text_fields,
-                label: lang.t('text_entry'),
-                onTap: () {
-                  Navigator.pushNamed(context, RouteNames.mealEntry);
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.camera_alt,
-                label: lang.t('capture_food'),
-                onTap: () {
-                  Navigator.pushNamed(context, RouteNames.foodRecognition);
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.primaryGreen, size: 32),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
-  }
-
-  String _getDayName(int weekday, LanguageProvider lang) {
-    if (lang.isAmharic) {
-      const days = ['ሰኞ', 'ማክ', 'ረቡ', 'ሐሙ', 'ዓር', 'ቅዳ', 'እሁ'];
-      return days[weekday - 1];
-    }
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[weekday - 1];
   }
 }
