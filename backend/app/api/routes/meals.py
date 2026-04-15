@@ -8,8 +8,7 @@
 # DELETE /{id}            — delete a meal
 # ============================================
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from app.core.dependencies import get_current_user
 from app.db.supabase import get_supabase_admin
 from app.schemas.meal import (
@@ -19,9 +18,7 @@ from app.schemas.meal import (
     MealAddIngredientsResponse,
     MealResponse,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
-from app.db.supabase import get_supabase_admin
-from app.core.dependencies import get_current_user
+from app.services.daily_summary_service import DailySummaryService
 from datetime import datetime
 import traceback
 
@@ -112,6 +109,13 @@ async def create_meal(
         item_data = item_result.data[0]
         item_data["food_item"] = food
         food_items_response.append(item_data)
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=datetime.now().date(),
+        operation="upsert"
+    )
 
     return MealCreateResponse(
         id=meal["id"],
@@ -252,6 +256,13 @@ async def add_ingredients_to_meal(
     # Update meal total calories
     new_total = meal["total_calories"] + added_calories
     supabase.table("meals").update({"total_calories": new_total}).eq("id", meal_id).execute()
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=datetime.fromisoformat(meal["created_at"]).date(),
+        operation="upsert"
+    )
 
     return MealAddIngredientsResponse(
         meal_id=meal_id,
@@ -586,5 +597,16 @@ async def delete_meal(
             detail="Meal not found.",
         )
 
+    # Get meal date for summary update
+    meal_date = datetime.fromisoformat(meal_result.data["created_at"]).date()
+    user_id = current_user["id"]
+
     # Delete cascades to meal_food_items and meal_ingredients
     supabase.table("meals").delete().eq("id", meal_id).execute()
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=meal_date,
+        operation="upsert"
+    )

@@ -11,6 +11,7 @@ class LeaderboardEntry(BaseModel):
     full_name: str
     days_goal_met: int
     current_streak: int
+    best_streak: int
 
 
 class LeaderboardResponse(BaseModel):

@@ -73,13 +73,11 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final dashboardData = await DashboardService.fetchUserDashboard();
-      final mealBreakdownData = await DashboardService.fetchMealBreakdownForDate(today);
-      final nutrientData = await DashboardService.fetchDailyNutrients(today);
       setState(() {
         targetCalories = dashboardData['dailyCalorieGoal'] ?? 2000;
         todayCalories = dashboardData['todayCalories'] ?? 0;
-        mealBreakdown = mealBreakdownData['mealBreakdown'];
-        nutrientBreakdown = nutrientData;
+        mealBreakdown = dashboardData['mealBreakdown'] ?? {};
+        nutrientBreakdown = dashboardData['nutrientBreakdown'] ?? {};
         isLoading = false;
       });
     } catch (e) {
@@ -106,18 +104,16 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final data = await DashboardService.fetchCaloriesForDate(date);
-      final mealBreakdownData = await DashboardService.fetchMealBreakdownForDate(date);
-      final nutrientData = await DashboardService.fetchDailyNutrients(date);
       setState(() {
         historicalData ??= {};
         historicalData![date] = {
           ...data,
-          'mealBreakdown': mealBreakdownData['mealBreakdown'],
-          'nutrientBreakdown': nutrientData,
+          'mealBreakdown': data['mealBreakdown'] ?? {},
+          'nutrientBreakdown': data['nutrientBreakdown'] ?? {},
         };
         // Always set mealBreakdown and nutrientBreakdown for the selected date (today or historical)
-        mealBreakdown = mealBreakdownData['mealBreakdown'];
-        nutrientBreakdown = nutrientData;
+        mealBreakdown = data['mealBreakdown'] ?? {};
+        nutrientBreakdown = data['nutrientBreakdown'] ?? {};
         isLoadingHistorical = false;
       });
     } catch (e) {

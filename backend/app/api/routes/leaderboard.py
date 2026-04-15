@@ -38,6 +38,24 @@ async def get_leaderboard(
 
     supabase = get_supabase_admin()
 
+    # Fetch profiles for all users who have meal data
+    # First get users who have meals in the lookback period
+    users_with_meals_result = (
+        supabase.table("meals")
+            .select("user_id")
+            .gte("created_at", since)
+            .execute()
+    )
+    user_ids = list({log["user_id"] for log in users_with_meals_result.data})
+    
+    profiles_result = (
+        supabase.table("profiles")
+            .select("id, full_name, daily_calorie_goal, current_streak, best_streak")
+            .in_("id", user_ids)
+            .execute()
+    )
+    profiles = {p["id"]: p for p in profiles_result.data}
+
     # Fetch recent meal logs with user profile data
     result = (
         supabase.table("meal_logs")
@@ -49,16 +67,6 @@ async def get_leaderboard(
 
     if not logs:
         return LeaderboardResponse(entries=[], total=0)
-
-    # Fetch profiles for all users who have logs
-    user_ids = list({log["user_id"] for log in logs})
-    profiles_result = (
-        supabase.table("profiles")
-        .select("id, full_name, daily_calorie_goal")
-        .in_("id", user_ids)
-        .execute()
-    )
-    profiles = {p["id"]: p for p in profiles_result.data}
 
     # Group calories by (user_id, date)
     daily_totals: dict[tuple[str, str], float] = {}
@@ -85,7 +93,8 @@ async def get_leaderboard(
                 user_id=uid,
                 full_name=profile.get("full_name", "Unknown"),
                 days_goal_met=days_met,
-                current_streak=0,  # streak can be added as an enhancement
+                current_streak=profile.get("current_streak", 0),
+                best_streak=profile.get("best_streak", 0)
             )
         )
 
