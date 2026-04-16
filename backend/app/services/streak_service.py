@@ -67,26 +67,26 @@ class StreakService:
                         new_streak = current_streak + 1
                         print(f"Continuing streak: {current_streak} -> {new_streak}")
                     else:
-                        # Starting new streak (after a gap)
+                        # Streak broken - start new streak at 1
                         new_streak = 1
-                        print(f"Starting new streak: was {current_streak}, now {new_streak}")
+                        print(f"Streak broken: was {current_streak}, now {new_streak}")
                 else:
                     # First meal ever
                     new_streak = 1
                     print(f"First meal ever: starting streak at 1")
             else:
-                # No meal today - check if streak is broken
+                # No meal today - streak is broken
                 if last_meal_date:
+                    # Check if last meal was yesterday
                     yesterday = today - timedelta(days=1)
-                    days_since_last_meal = (today - last_meal_date).days
-                    
-                    if days_since_last_meal > 1:
-                        # Streak broken - reset to 0
+                    if last_meal_date == yesterday:
+                        # Last meal was yesterday, but no meal today - streak broken
                         new_streak = 0
-                        print(f"Streak broken: was {current_streak}, now 0 (gap of {days_since_last_meal} days)")
+                        print(f"Streak broken: was {current_streak}, now 0 (missed today)")
                     else:
-                        # No meal today but streak intact
-                        print(f"No meal today but streak intact at {current_streak}")
+                        # Already missed previous days - streak already broken
+                        new_streak = 0
+                        print(f"Streak already broken: remains 0")
                 else:
                     # Never had a meal before
                     new_streak = 0

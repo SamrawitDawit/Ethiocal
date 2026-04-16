@@ -50,43 +50,56 @@ class DashboardService {
   }
 
   static Future<Map<String, dynamic>> fetchCaloriesForDate(DateTime date) async {
-    try {
-      print('DEBUG: Fetching optimized calories for date: ${date.toIso8601String().split('T')[0]}');
-      
-      final dateStr = date.toIso8601String().split('T')[0];
-      
-      // Single API call to get daily summary
-      final summaryData = await ApiService.get(
-        '/api/v1/daily-summary/',
-        requireAuth: true,
-        queryParams: {
-          'date': dateStr,
-        },
-      );
-      
-      print('DEBUG: Summary data for date $dateStr: $summaryData');
+  try {
+    final dateStr = date.toIso8601String().split('T')[0];
+    
+    final summaryData = await ApiService.get(
+      '/api/v1/daily-summary/',
+      requireAuth: true,
+      queryParams: {'date': dateStr},
+    );
+    
+    print('DEBUG: Summary data for date $dateStr: $summaryData');
 
-      if (summaryData['success'] == true) {
-        return {
-          'date': date,
-          'calories': summaryData['total_calories'] ?? 0,
-          'target': summaryData['daily_calorie_goal'] ?? 2000,
-          'success': true,
-        };
-      } else {
-        throw Exception('Daily summary returned success=false');
+    if (summaryData['success'] == true) {
+      // Cast meal breakdown properly
+      final dynamic mealBreakdown = summaryData['meal_breakdown'];
+      Map<String, dynamic> typedMealBreakdown = {};
+      
+      if (mealBreakdown is Map) {
+        typedMealBreakdown = Map<String, dynamic>.from(mealBreakdown);
       }
-    } catch (e) {
-      print('ERROR in fetchCaloriesForDate: $e');
+      
       return {
         'date': date,
-        'calories': 0,
-        'target': 2000,
-        'success': false,
-        'error': e.toString(),
+        'calories': summaryData['total_calories'] ?? 0,
+        'target': summaryData['daily_calorie_goal'] ?? 2000,
+        'success': true,
+        'mealBreakdown': typedMealBreakdown,
+        'nutrientBreakdown': {
+          'totalProtein': summaryData['total_protein'] ?? 0.0,
+          'totalCarbohydrates': summaryData['total_carbohydrates'] ?? 0.0,
+          'totalFat': summaryData['total_fat'] ?? 0.0,
+          'totalCalories': summaryData['total_calories'] ?? 0.0,
+          'mealCount': summaryData['meal_count'] ?? 0,
+        },
       };
+    } else {
+      throw Exception('Daily summary returned success=false');
     }
+  } catch (e) {
+    print('ERROR in fetchCaloriesForDate: $e');
+    return {
+      'date': date,
+      'calories': 0,
+      'target': 2000,
+      'success': false,
+      'error': e.toString(),
+      'mealBreakdown': {},
+      'nutrientBreakdown': {},
+    };
   }
+}
 
   static Future<Map<String, dynamic>> fetchMealBreakdownForDate(DateTime date) async {
     try {
