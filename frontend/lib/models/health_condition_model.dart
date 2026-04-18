@@ -19,7 +19,7 @@ class HealthCondition {
     return HealthCondition(
       id: json['id'],
       conditionName: json['condition_name'],
-      restrictedNutrients: json['restricted_nutrients'],
+      restrictedNutrients: json['restricted_nutrient'],
       thresholdAmount: json['threshold_amount'],
       thresholdUnit: json['threshold_unit'],
     );
@@ -29,7 +29,7 @@ class HealthCondition {
     return {
       'id': id,
       'condition_name': conditionName,
-      'restricted_nutrients': restrictedNutrients,
+      'restricted_nutrient': restrictedNutrients,
       'threshold_amount': thresholdAmount,
       'threshold_unit': thresholdUnit,
     };

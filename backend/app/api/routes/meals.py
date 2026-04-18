@@ -8,8 +8,7 @@
 # DELETE /{id}            — delete a meal
 # ============================================
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from app.core.dependencies import get_current_user
 from app.db.supabase import get_supabase_admin
 from app.schemas.meal import (
@@ -19,9 +18,7 @@ from app.schemas.meal import (
     MealAddIngredientsResponse,
     MealResponse,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
-from app.db.supabase import get_supabase_admin
-from app.core.dependencies import get_current_user
+from app.services.daily_summary_service import DailySummaryService
 from datetime import datetime
 import traceback
 
@@ -150,6 +147,13 @@ async def create_meal(
         item_data = item_result.data[0]
         item_data["food_item"] = food
         food_items_response.append(item_data)
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=datetime.now().date(),
+        operation="upsert"
+    )
 
     return MealCreateResponse(
         id=meal["id"],
@@ -292,6 +296,13 @@ async def add_ingredients_to_meal(
     new_total = meal["total_calories"] + added_calories
     supabase.table("meals").update({"total_calories": new_total}).eq("id", meal_id).execute()
 
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=datetime.fromisoformat(meal["created_at"]).date(),
+        operation="upsert"
+    )
+
     return MealAddIngredientsResponse(
         meal_id=meal_id,
         ingredients=ingredients_response,
@@ -304,16 +315,29 @@ async def add_ingredients_to_meal(
 async def get_meal_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    date: str = Query(None, description="Date in YYYY-MM-DD format (optional)"),
     current_user: dict = Depends(get_current_user),
 ):
     """Return the current user's meal history (newest first)."""
     supabase = get_supabase_admin()
 
-    # Get meals
-    meals_result = (
+    # Build query
+    query = (
         supabase.table("meals")
         .select("*")
         .eq("user_id", current_user["id"])
+    )
+
+    # Add date filtering if provided
+    if date:
+        query_date = datetime.strptime(date, '%Y-%m-%d')
+        start_datetime = query_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_datetime = query_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        query = query.gte("created_at", start_datetime.isoformat()).lte("created_at", end_datetime.isoformat())
+
+    # Get meals
+    meals_result = (
+        query
         .order("created_at", desc=True)
         .range(skip, skip + limit - 1)
         .execute()
@@ -431,6 +455,117 @@ async def get_meal_food_items_by_date(
         return {"meal_food_items": [], "error": f"Unexpected error: {str(e)}"}
 
 
+@router.get("/daily-nutrients")
+async def get_daily_nutrients(
+    date: str = Query(..., description="Date in YYYY-MM-DD format"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get total nutrient breakdown (protein, carbs, fat) for a specific date."""
+    try:
+        print(f"\n=== get_daily_nutrients called ===")
+        print(f"Date: {date}")
+        print(f"User: {current_user.get('id')}")
+        
+        supabase = get_supabase_admin()
+        user_id = current_user["id"]
+        
+        # Parse date range
+        query_date = datetime.strptime(date, '%Y-%m-%d')
+        start_datetime = query_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_datetime = query_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        print(f"Date range: {start_datetime} to {end_datetime}")
+        
+        # Get meals for the date
+        meals_result = (
+            supabase.table("meals")
+            .select("id, total_calories")
+            .eq("user_id", user_id)
+            .gte("created_at", start_datetime.isoformat())
+            .lte("created_at", end_datetime.isoformat())
+            .execute()
+        )
+        
+        print(f"Meals found: {len(meals_result.data) if meals_result.data else 0}")
+        
+        # Calculate totals from meals directly
+        total_calories = 0.0
+        total_protein = 0.0
+        total_carbs = 0.0
+        total_fat = 0.0
+        meal_count = 0
+        
+        if meals_result.data:
+            meal_count = len(meals_result.data)
+            
+            # Sum calories from meals
+            for meal in meals_result.data:
+                total_calories += meal.get("total_calories", 0)
+            
+            # Get all meal IDs
+            meal_ids = [meal["id"] for meal in meals_result.data]
+            
+            # Get food items for these meals
+            try:
+                food_items_result = (
+                    supabase.table("meal_food_items")
+                    .select("""
+                        quantity,
+                        total_calories,
+                        food_item:food_items (
+                            protein,
+                            carbohydrates,
+                            fat,
+                            calories_per_100g
+                        )
+                    """)
+                    .in_("meal_id", meal_ids)
+                    .execute()
+                )
+                
+                print(f"Food items found: {len(food_items_result.data) if food_items_result.data else 0}")
+                
+                # Calculate nutrient totals
+                for item in (food_items_result.data or []):
+                    quantity = item.get("quantity", 1)
+                    food_item = item.get("food_item")
+                    
+                    if food_item:
+                        # Calculate based on quantity and standard serving size
+                        # Assuming standard_serving_size is 100g if not specified
+                        serving_multiplier = quantity
+                        
+                        total_protein += (food_item.get("protein", 0) * serving_multiplier)
+                        total_carbs += (food_item.get("carbohydrates", 0) * serving_multiplier)
+                        total_fat += (food_item.get("fat", 0) * serving_multiplier)
+                        
+            except Exception as e:
+                print(f"Error getting food items: {e}")
+                # Continue with just calorie totals
+        
+        response_data = {
+            "date": date,
+            "total_protein": round(total_protein, 1),
+            "total_carbohydrates": round(total_carbs, 1),
+            "total_fat": round(total_fat, 1),
+            "total_calories": round(total_calories, 1),
+            "meal_count": meal_count
+        }
+        
+        print(f"Response: {response_data}")
+        print("=== get_daily_nutrients completed ===\n")
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"ERROR in get_daily_nutrients: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get daily nutrients: {str(e)}"
+        )
+    
 @router.get("/{meal_id}", response_model=MealResponse)
 async def get_meal(
     meal_id: str,
@@ -477,7 +612,6 @@ async def get_meal(
 
     return meal
 
-
 @router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_meal(
     meal_id: str,
@@ -502,5 +636,16 @@ async def delete_meal(
             detail="Meal not found.",
         )
 
+    # Get meal date for summary update
+    meal_date = datetime.fromisoformat(meal_result.data["created_at"]).date()
+    user_id = current_user["id"]
+
     # Delete cascades to meal_food_items and meal_ingredients
     supabase.table("meals").delete().eq("id", meal_id).execute()
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=meal_date,
+        operation="upsert"
+    )

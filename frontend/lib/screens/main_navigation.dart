@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
+import '../providers/notification_provider.dart';
 import '../screens/home_page.dart';
 import '../screens/history_page.dart';
+import '../screens/leaderboard_page.dart';
 import '../screens/profile_page.dart';
-import '../screens/food_recognition_page.dart';
-import '../screens/stats_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -21,11 +23,20 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomePage(),
     const HistoryPage(),
     const ProfilePage(),
-    const StatsPage(),
+    const LeaderboardPage(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().loadUnreadCount();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -36,7 +47,7 @@ class _MainNavigationState extends State<MainNavigation> {
         margin: const EdgeInsets.only(top: 20),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
+         // border: Border.all(color: Colors.white, width: 4),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -89,26 +100,26 @@ class _MainNavigationState extends State<MainNavigation> {
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: lang.t('home'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
-              activeIcon: Icon(Icons.history),
-              label: 'History',
+              icon: const Icon(Icons.history_outlined),
+              activeIcon: const Icon(Icons.history),
+              label: lang.t('history'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
+              icon: const Icon(Icons.person_outline),
+              activeIcon: const Icon(Icons.person),
+              label: lang.t('profile'),
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
-              activeIcon: Icon(Icons.bar_chart),
-              label: 'Stats',
+              icon: const Icon(Icons.leaderboard_outlined),
+              activeIcon: const Icon(Icons.leaderboard),
+              label: lang.t('leaderboard'),
             ),
           ],
         ),

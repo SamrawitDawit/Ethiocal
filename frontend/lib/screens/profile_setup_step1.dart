@@ -17,21 +17,33 @@ class ProfileSetupStep1 extends StatefulWidget {
 }
 
 class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
-  late TextEditingController _ageController;
-  late TextEditingController _calorieController;
+  late TextEditingController _birthDateController;
+
+  Future<void> _selectBirthDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(const Duration(days: 365 * 25)), // Default to 25 years ago
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 120)), // 120 years ago
+      lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)), // 13 years ago (minimum age)
+    );
+    
+    if (picked != null) {
+      final formattedDate = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      _birthDateController.text = formattedDate;
+      Provider.of<ProfileSetupProvider>(context, listen: false).setBirthDate(formattedDate);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     final provider = Provider.of<ProfileSetupProvider>(context, listen: false);
-    _ageController = TextEditingController(text: provider.age.toString());
-    _calorieController = TextEditingController(text: provider.dailyCalorieGoal.toString());
+    _birthDateController = TextEditingController(text: provider.birthDate);
   }
 
   @override
   void dispose() {
-    _ageController.dispose();
-    _calorieController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
@@ -98,9 +110,9 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Age Field
+                        // Birth Date Field
                         Text(
-                          'Age',
+                          'Birth Date',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
@@ -108,71 +120,30 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: CustomTextField(
-                                controller: _ageController,
-                                hintText: 'Enter your age',
-                                prefixIcon: Icons.person,
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your age';
-                                  }
-                                  final age = int.tryParse(value);
-                                  if (age == null || age <= 0) {
-                                    return 'Please enter a valid age';
-                                  }
-                                  return null;
-                                },
-                                onChanged: (value) {
-                                  final age = int.tryParse(value) ?? 0;
-                                  provider.setAge(age);
-                                },
-                              ),
+                        GestureDetector(
+                          onTap: () => _selectBirthDate(context),
+                          child: AbsorbPointer(
+                            child: CustomTextField(
+                              controller: _birthDateController,
+                              hintText: 'YYYY-MM-DD',
+                              prefixIcon: Icons.cake,
+                              keyboardType: TextInputType.none,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please select your birth date';
+                                }
+                                // Basic date format validation
+                                final dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+                                if (!dateRegex.hasMatch(value)) {
+                                  return 'Please enter a valid date (YYYY-MM-DD)';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                provider.setBirthDate(value);
+                              },
                             ),
-                            const SizedBox(width: 12),
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryGreen,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      final currentAge = int.tryParse(_ageController.text) ?? 0;
-                                      final newAge = currentAge + 1;
-                                      _ageController.text = newAge.toString();
-                                      provider.setAge(newAge);
-                                    },
-                                    child: const Icon(
-                                      Icons.keyboard_arrow_up,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      final currentAge = int.tryParse(_ageController.text) ?? 0;
-                                      final newAge = (currentAge > 0) ? currentAge - 1 : 0;
-                                      _ageController.text = newAge.toString();
-                                      provider.setAge(newAge);
-                                    },
-                                    child: const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 24),
 
@@ -291,9 +262,9 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Target Calorie
+                        // Goal Selection
                         Text(
-                          'Target Calorie',
+                          'Fitness Goal',
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
@@ -301,30 +272,34 @@ class _ProfileSetupStep1State extends State<ProfileSetupStep1> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        CustomTextField(
-                          controller: _calorieController,
-                          hintText: 'Enter daily calorie goal',
-                          prefixIcon: Icons.local_fire_department,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your daily calorie goal';
-                            }
-                            final calories = int.tryParse(value);
-                            if (calories == null || calories <= 0) {
-                              return 'Please enter a valid calorie goal';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) {
-                            final calories = int.tryParse(value) ?? 0;
-                            provider.setDailyCalorieGoal(calories);
-                          },
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.inputFill,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.inputBorder),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: provider.goal,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(value: 'maintain', child: Text('Maintain Weight')),
+                                DropdownMenuItem(value: 'lose_weight', child: Text('Lose Weight')),
+                                DropdownMenuItem(value: 'gain_weight', child: Text('Gain Weight')),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  provider.setGoal(value);
+                                }
+                              },
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 40),
 
                         // Step Indicator
-                        const StepIndicator(currentStep: 1, totalSteps: 3),
+                        const StepIndicator(currentStep: 1, totalSteps: 4),
                         const SizedBox(height: 20),
 
                         // Continue Button

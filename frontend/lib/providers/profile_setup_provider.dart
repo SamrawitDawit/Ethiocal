@@ -5,10 +5,11 @@ import '../services/profile_service.dart';
 
 class ProfileSetupProvider extends ChangeNotifier {
   // Step 1: Basic Info
-  int _age = 25;
+  String _birthDate = '2000-01-01';
   String _gender = 'Male';
   String _activityLevel = 'Sedentary';
   int _dailyCalorieGoal = 2000;
+  String _goal = 'maintain'; // 'lose_weight', 'maintain', 'gain_weight'
 
   // Step 2: Body Measurements
   double _height = 170;
@@ -27,10 +28,11 @@ class ProfileSetupProvider extends ChangeNotifier {
   String _submitError = '';
 
   // Getters
-  int get age => _age;
+  String get birthDate => _birthDate;
   String get gender => _gender;
   String get activityLevel => _activityLevel;
   int get dailyCalorieGoal => _dailyCalorieGoal;
+  String get goal => _goal;
   double get height => _height;
   String get heightUnit => _heightUnit;
   double get weight => _weight;
@@ -43,18 +45,21 @@ class ProfileSetupProvider extends ChangeNotifier {
   String get submitError => _submitError;
 
   // Setters for Step 1
-  void setAge(int age) {
-    _age = age;
+  void setBirthDate(String birthDate) {
+    _birthDate = birthDate;
+    _calculateAndUpdateDailyCalorieGoal();
     notifyListeners();
   }
 
   void setGender(String gender) {
     _gender = gender;
+    _calculateAndUpdateDailyCalorieGoal();
     notifyListeners();
   }
 
   void setActivityLevel(String activityLevel) {
     _activityLevel = activityLevel;
+    _calculateAndUpdateDailyCalorieGoal();
     notifyListeners();
   }
 
@@ -63,9 +68,42 @@ class ProfileSetupProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setGoal(String goal) {
+    _goal = goal;
+    // Automatically calculate daily calorie goal when goal changes
+    _calculateAndUpdateDailyCalorieGoal();
+    notifyListeners();
+  }
+
+  // Calculate and update daily calorie goal based on current profile data
+  void _calculateAndUpdateDailyCalorieGoal() {
+    // Only calculate if we have valid height and weight
+    if (_height > 0 && _weight > 0) {
+      final profile = _createTemporaryProfile();
+      _dailyCalorieGoal = profile.calculateDailyCalorieGoal();
+    }
+  }
+
+  // Create a temporary profile for calculation purposes
+  Profile _createTemporaryProfile() {
+    return Profile(
+      birthDate: _birthDate,
+      gender: _gender,
+      height: _height,
+      heightUnit: _heightUnit,
+      weight: _weight,
+      weightUnit: _weightUnit,
+      activityLevel: _activityLevel,
+      dailyCalorieGoal: _dailyCalorieGoal,
+      healthConditionIds: selectedHealthConditionIds,
+      goal: _goal,
+    );
+  }
+
   // Setters for Step 2
   void setHeight(double height) {
     _height = height;
+    _calculateAndUpdateDailyCalorieGoal();
     notifyListeners();
   }
 
@@ -76,6 +114,7 @@ class ProfileSetupProvider extends ChangeNotifier {
 
   void setWeight(double weight) {
     _weight = weight;
+    _calculateAndUpdateDailyCalorieGoal();
     notifyListeners();
   }
 
@@ -142,7 +181,7 @@ class ProfileSetupProvider extends ChangeNotifier {
   // Create profile object
   Profile getProfile() {
     return Profile(
-      age: _age,
+      birthDate: _birthDate,
       gender: _gender,
       height: _height,
       heightUnit: _heightUnit,
@@ -151,11 +190,12 @@ class ProfileSetupProvider extends ChangeNotifier {
       activityLevel: _activityLevel,
       dailyCalorieGoal: _dailyCalorieGoal,
       healthConditionIds: selectedHealthConditionIds,
+      goal: _goal,
     );
   }
 
   // Submit profile
-  Future<void> submitProfile() async {
+  Future<bool> submitProfile() async {
     _isSubmitting = true;
     _submitError = '';
     notifyListeners();
@@ -163,8 +203,10 @@ class ProfileSetupProvider extends ChangeNotifier {
     try {
       final profile = getProfile();
       await ProfileService.createProfile(profile: profile);
+      return true; // Success
     } catch (e) {
       _submitError = e.toString();
+      return false; // Failure
     } finally {
       _isSubmitting = false;
       notifyListeners();
@@ -173,7 +215,7 @@ class ProfileSetupProvider extends ChangeNotifier {
 
   // Validation
   bool isStep1Valid() {
-    return _age > 0 && _dailyCalorieGoal > 0;
+    return _birthDate.isNotEmpty && _goal.isNotEmpty;
   }
 
   bool isStep2Valid() {
