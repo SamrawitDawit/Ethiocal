@@ -143,6 +143,9 @@ class FoodRecognitionResult(BaseModel):
     bounding_box: BoundingBox | None = None
     mask: SegmentationMask | None = None
     food_item: FoodItemResponse | None = None  # matched DB entry, if found
+    portion_grams: float | None = None  # estimated portion size in grams
+    estimated_calories: float | None = None  # calculated calories based on portion
+    estimation_method: str | None = None  # 'mask_area' or 'standard_serving'
 
 
 class FoodRecognitionResponse(BaseModel):
@@ -151,3 +154,7 @@ class FoodRecognitionResponse(BaseModel):
     image_url: str
     image_width: int | None = None
     image_height: int | None = None
+    meal_id: str | None = None  # Set if save_to_history was true and meal was created
+    meal_type: str | None = None  # Set if save_to_history was true
+    total_calories: float | None = None  # Set if save_to_history was true
+    saved_to_history: bool = False  # Whether the meal was saved to history

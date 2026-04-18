@@ -44,6 +44,9 @@ class ApiConstants {
 
   // Notification endpoints
   static const String notificationsEndpoint = '/api/v1/notifications';
+
+  // Leaderboard endpoint
+  static const String leaderboardEndpoint = '/api/v1/leaderboard';
 }
 
 class RouteNames {
@@ -62,6 +65,7 @@ class RouteNames {
   static const String history = '/history';
   static const String profile = '/profile';
   static const String stats = '/stats';
+  static const String leaderboard = '/leaderboard';
   static const String notificationSettings = '/notification-settings';
   static const String languageSettings = '/language-settings';
   static const String educationList = '/education';

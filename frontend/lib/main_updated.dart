@@ -79,6 +79,7 @@ class EthioCalApp extends StatelessWidget {
               RouteNames.history: (context) => const HistoryPage(),
               RouteNames.profile: (context) => const ProfilePage(),
               RouteNames.stats: (context) => const StatsPage(),
+              RouteNames.leaderboard: (context) => const LeaderboardPage(),
               RouteNames.notificationSettings: (context) =>
                   const NotificationSettingsPage(),
               RouteNames.languageSettings: (context) =>

@@ -35,6 +35,14 @@ async def create_meal(
     """Create a new meal with selected food items.
 
     Step 1 of meal logging - select the foods you ate.
+
+    For image-based meals (when image_url is provided):
+    - quantity contains portion_grams (actual grams from AI estimation)
+    - calories = (portion_grams / 100) * calories_per_100g
+
+    For text-based meals (no image_url):
+    - quantity is a multiplier (1.0, 1.5, etc)
+    - calories = quantity * standard_serving_size / 100 * calories_per_100g
     """
     if payload.meal_type not in VALID_MEAL_TYPES:
         raise HTTPException(
@@ -70,21 +78,46 @@ async def create_meal(
             detail=f"Food items not found: {missing}",
         )
 
-    # Calculate total calories
+    # Determine if this is image-based or text-based
+    is_image_based = payload.image_url is not None
+
+    # Calculate total calories and portion size
     total_calories = 0.0
+    total_portion_grams = 0.0  # For image-based meals
+
     for item in payload.food_items:
         food = food_map[item.food_item_id]
-        total_calories += item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
+        if item.quantity is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="quantity is required for all food items",
+            )
+
+        if is_image_based:
+            # Image-based: quantity = portion_grams
+            # calories = (portion_grams / 100) * calories_per_100g
+            item_calories = (item.quantity / 100.0) * food["calories_per_100g"]
+            total_portion_grams += item.quantity  # Sum actual grams
+        else:
+            # Text-based: quantity = multiplier
+            # calories = quantity * standard_serving_size / 100 * calories_per_100g
+            item_calories = item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
+        total_calories += item_calories
 
     # Create the meal
+    meal_data = {
+        "user_id": user_id,
+        "meal_type": payload.meal_type,
+        "portion_size": total_portion_grams if is_image_based else payload.portion_size,
+        "total_calories": total_calories,
+    }
+    # Add image URL if provided
+    if payload.image_url:
+        meal_data["image_url"] = payload.image_url
+
     meal_result = (
         supabase.table("meals")
-        .insert({
-            "user_id": user_id,
-            "meal_type": payload.meal_type,
-            "portion_size": payload.portion_size,
-            "total_calories": total_calories,
-        })
+        .insert(meal_data)
         .execute()
     )
     meal = meal_result.data[0]
@@ -93,7 +126,12 @@ async def create_meal(
     food_items_response = []
     for item in payload.food_items:
         food = food_map[item.food_item_id]
-        item_calories = item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
+        if is_image_based:
+            # Image-based: quantity = portion_grams
+            item_calories = (item.quantity / 100.0) * food["calories_per_100g"]
+        else:
+            # Text-based: quantity = multiplier
+            item_calories = item.quantity * food["standard_serving_size"] / 100.0 * food["calories_per_100g"]
 
         item_result = (
             supabase.table("meal_food_items")
@@ -123,6 +161,7 @@ async def create_meal(
         meal_type=meal["meal_type"],
         portion_size=meal["portion_size"],
         total_calories=total_calories,
+        image_url=meal.get("image_url"),
         food_items=food_items_response,
         created_at=meal["created_at"],
     )

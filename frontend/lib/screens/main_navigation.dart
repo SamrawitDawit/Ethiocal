@@ -6,8 +6,8 @@ import '../providers/language_provider.dart';
 import '../providers/notification_provider.dart';
 import '../screens/home_page.dart';
 import '../screens/history_page.dart';
+import '../screens/leaderboard_page.dart';
 import '../screens/profile_page.dart';
-import '../screens/stats_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -23,7 +23,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomePage(),
     const HistoryPage(),
     const ProfilePage(),
-    const StatsPage(),
+    const LeaderboardPage(),
   ];
 
   @override
@@ -117,9 +117,9 @@ class _MainNavigationState extends State<MainNavigation> {
               label: lang.t('profile'),
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.bar_chart_outlined),
-              activeIcon: const Icon(Icons.bar_chart),
-              label: lang.t('stats'),
+              icon: const Icon(Icons.leaderboard_outlined),
+              activeIcon: const Icon(Icons.leaderboard),
+              label: lang.t('leaderboard'),
             ),
           ],
         ),

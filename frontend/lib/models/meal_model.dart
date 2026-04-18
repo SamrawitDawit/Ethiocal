@@ -118,6 +118,7 @@ class MealCreateResponse {
   final String mealType;
   final double portionSize;
   final double totalCalories;
+  final String? imageUrl;
   final List<MealFoodItem> foodItems;
   final String createdAt;
 
@@ -127,6 +128,7 @@ class MealCreateResponse {
     required this.mealType,
     required this.portionSize,
     required this.totalCalories,
+    this.imageUrl,
     required this.foodItems,
     required this.createdAt,
   });
@@ -138,6 +140,7 @@ class MealCreateResponse {
       mealType: json['meal_type'],
       portionSize: (json['portion_size'] as num).toDouble(),
       totalCalories: (json['total_calories'] as num).toDouble(),
+      imageUrl: json['image_url'],
       foodItems: (json['food_items'] as List)
           .map((e) => MealFoodItem.fromJson(e))
           .toList(),

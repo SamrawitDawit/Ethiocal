@@ -42,6 +42,7 @@ class MealService {
     required String mealType,
     required List<SelectedFoodItem> foodItems,
     double portionSize = 1.0,
+    String? imageUrl,
   }) async {
     final body = {
       'meal_type': mealType,
@@ -53,6 +54,11 @@ class MealService {
               })
           .toList(),
     };
+
+    // Add image URL if provided
+    if (imageUrl != null) {
+      body['image_url'] = imageUrl;
+    }
 
     final json = await ApiService.post(
       ApiConstants.mealsEndpoint,

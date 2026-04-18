@@ -19,7 +19,11 @@ MealType = Literal["breakfast", "lunch", "dinner", "snack"]
 # --- Meal Food Item Entry ---
 
 class MealFoodItemEntry(BaseModel):
-    """A food item to add to a meal."""
+    """A food item to add to a meal.
+
+    For text-based meals: quantity is a multiplier (1.0, 1.5, etc)
+    For image-based meals: quantity is portion_grams (actual grams from AI)
+    """
     food_item_id: str
     quantity: float = 1.0
 
@@ -61,6 +65,7 @@ class MealCreate(BaseModel):
     meal_type: MealType
     food_items: list[MealFoodItemEntry]
     portion_size: float = 1.0
+    image_url: str | None = None  # Optional image URL from food recognition
 
 
 class MealCreateResponse(BaseModel):
@@ -70,6 +75,7 @@ class MealCreateResponse(BaseModel):
     meal_type: str
     portion_size: float
     total_calories: float
+    image_url: str | None = None
     food_items: list[MealFoodItemResponse]
     created_at: datetime
 
