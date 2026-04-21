@@ -41,6 +41,10 @@ class ApiConstants {
 
   //Health Condition Endpoints
   static const String healthEndpoint = '/api/v1/health/';
+  static const String mealCheckEndpoint = '/api/v1/health/meal-check';
+
+  static const String nutritionDisclaimer =
+      'These are general dietary targets based on 2026 ADA/AHA/Ethiopian NCD guidelines to support clinical goals (HbA1c <7.0%, BP <130/80, LDL <100 mg/dL or lower). They are not medical advice. Always consult your doctor.';
 
   // Notification endpoints
   static const String notificationsEndpoint = '/api/v1/notifications';

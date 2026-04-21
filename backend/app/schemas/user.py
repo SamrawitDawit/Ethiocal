@@ -37,6 +37,11 @@ class UserProfileSetup(BaseModel):
     weight: float | None = None
     activity_level: Literal["Sedentary", "Lightly Active", "Moderately Active", "Very Active"] | None = None
     daily_calorie_goal: float = 2000.0
+    has_diabetes: bool = False
+    has_hypertension: bool = False
+    has_high_cholesterol: bool = False
+    diabetes_type: Literal["Type 1", "Type 2"] | None = None
+    latest_hba1c: float | None = None
     health_condition_ids: list[str] = []
 
 
@@ -54,6 +59,11 @@ class UserProfileDataUpdate(BaseModel):
     weight: float | None = None
     activity_level: Literal["Sedentary", "Lightly Active", "Moderately Active", "Very Active"] | None = None
     daily_calorie_goal: float | None = None
+    has_diabetes: bool | None = None
+    has_hypertension: bool | None = None
+    has_high_cholesterol: bool | None = None
+    diabetes_type: Literal["Type 1", "Type 2"] | None = None
+    latest_hba1c: float | None = None
 
 
 # --- Health Conditions ---
@@ -92,6 +102,11 @@ class UserProfileDataResponse(BaseModel):
     weight: float | None = None
     activity_level: str | None = None
     daily_calorie_goal: float = 2000.0
+    has_diabetes: bool = False
+    has_hypertension: bool = False
+    has_high_cholesterol: bool = False
+    diabetes_type: str | None = None
+    latest_hba1c: float | None = None
     created_at: datetime
 
 
@@ -123,6 +138,11 @@ class UserBasicResponse(BaseModel):
     weight: float | None = None
     activity_level: str | None = None
     daily_calorie_goal: float = 2000.0
+    has_diabetes: bool = False
+    has_hypertension: bool = False
+    has_high_cholesterol: bool = False
+    diabetes_type: str | None = None
+    latest_hba1c: float | None = None
     created_at: datetime
 
 

@@ -112,6 +112,10 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
 
   // Saving state
   bool _isSaving = false;
+  Map<String, dynamic>? _mealTargetCheckResult;
+  bool _isCheckingMealTargets = false;
+  String? _mealTargetCheckError;
+  int _mealTargetCheckVersion = 0;
 
   @override
   void initState() {
@@ -231,6 +235,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       }
       _selectedFoodDropdown = null;
     });
+    _scheduleMealTargetCheck();
   }
 
   void _removeAdditionalFood(int index) {
@@ -241,6 +246,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         _additionalFoods.removeAt(index);
       }
     });
+    _scheduleMealTargetCheck();
   }
 
   void _addAdditionalIngredient(Ingredient item) {
@@ -254,6 +260,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       }
       _selectedIngredientDropdown = null;
     });
+    _scheduleMealTargetCheck();
   }
 
   void _removeAdditionalIngredient(int index) {
@@ -264,6 +271,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         _additionalIngredients.removeAt(index);
       }
     });
+    _scheduleMealTargetCheck();
   }
 
   double get _detectedFoodsCalories {
@@ -288,6 +296,111 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         _additionalIngredientsCalories;
   }
 
+  double get _totalProtein {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.protein * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalProtein) +
+        _additionalIngredients.fold(
+            0.0, (sum, item) => sum + item.totalProtein);
+  }
+
+  double get _totalCarbs {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.carbohydrates * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalCarbs) +
+        _additionalIngredients.fold(0.0, (sum, item) => sum + item.totalCarbs);
+  }
+
+  double get _totalFat {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.fat * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalFat) +
+        _additionalIngredients.fold(0.0, (sum, item) => sum + item.totalFat);
+  }
+
+  double get _totalSaturatedFatG {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.saturatedFatG * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(
+            0.0, (sum, item) => sum + item.totalSaturatedFatG) +
+        _additionalIngredients.fold(
+            0.0, (sum, item) => sum + item.totalSaturatedFatG);
+  }
+
+  double get _totalFiber {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.fiber * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalFiber) +
+        _additionalIngredients.fold(0.0, (sum, item) => sum + item.totalFiber);
+  }
+
+  double get _totalSodiumMg {
+    final detected = _recognitionResult?.predictions
+            .where((prediction) => prediction.foodItem != null)
+            .fold(0.0, (sum, prediction) {
+          final food = prediction.foodItem!;
+          final portionGrams = prediction.portionGrams ?? 150.0;
+          return sum + food.sodiumMg * (portionGrams / 100.0);
+        }) ??
+        0.0;
+
+    return detected +
+        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalSodiumMg) +
+        _additionalIngredients.fold(
+            0.0, (sum, item) => sum + item.totalSodiumMg);
+  }
+
+  Map<String, dynamic> get _mealNutrientsPayload {
+    return {
+      'calories': _totalCalories,
+      'carbs_g': _totalCarbs,
+      'saturated_fat_g': _totalSaturatedFatG,
+      'sodium_mg': _totalSodiumMg,
+      'fiber_g': _totalFiber,
+      'protein_g': _totalProtein,
+    };
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.error),
@@ -297,6 +410,150 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.primaryGreen),
+    );
+  }
+
+  void _scheduleMealTargetCheck() {
+    if (_recognitionResult == null &&
+        _additionalFoods.isEmpty &&
+        _additionalIngredients.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _mealTargetCheckResult = null;
+          _mealTargetCheckError = null;
+        });
+      }
+      return;
+    }
+
+    final currentVersion = ++_mealTargetCheckVersion;
+    setState(() {
+      _isCheckingMealTargets = true;
+      _mealTargetCheckError = null;
+    });
+
+    MealService.checkMealAgainstTargets(_mealNutrientsPayload).then((result) {
+      if (!mounted || currentVersion != _mealTargetCheckVersion) {
+        return;
+      }
+      setState(() {
+        _mealTargetCheckResult = result;
+        _isCheckingMealTargets = false;
+      });
+    }).catchError((error) {
+      if (!mounted || currentVersion != _mealTargetCheckVersion) {
+        return;
+      }
+      setState(() {
+        _mealTargetCheckError = error.toString();
+        _isCheckingMealTargets = false;
+      });
+    });
+  }
+
+  List<String> get _mealWarnings {
+    final warnings = _mealTargetCheckResult?['warnings'];
+    if (warnings is List) {
+      return warnings.map((warning) => warning.toString()).toList();
+    }
+    return const [];
+  }
+
+  Map<String, dynamic> get _mealProgress {
+    final progress = _mealTargetCheckResult?['progress'];
+    if (progress is Map<String, dynamic>) {
+      return progress;
+    }
+    if (progress is Map) {
+      return Map<String, dynamic>.from(progress);
+    }
+    return {};
+  }
+
+  Future<bool> _showMealWarningDialog() async {
+    if (_mealWarnings.isEmpty) return true;
+
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Review meal guidance'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ..._mealWarnings.map(
+                (warning) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('• $warning'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                ApiConstants.nutritionDisclaimer,
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Edit portion'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+              _showAlternativeSuggestions();
+            },
+            child: const Text('Suggest alternatives'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen),
+            child: const Text('Add anyway'),
+          ),
+        ],
+      ),
+    );
+
+    return choice ?? false;
+  }
+
+  void _showAlternativeSuggestions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Suggested alternatives',
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Text(
+                'Lower-salt: choose less injera with stews that are heavily salted.',
+                style: GoogleFonts.poppins(fontSize: 13)),
+            const SizedBox(height: 8),
+            Text(
+                'Lower-carb: favor vegetables, legumes, and smaller grain portions.',
+                style: GoogleFonts.poppins(fontSize: 13)),
+            const SizedBox(height: 8),
+            Text(
+                'Higher-fiber: add greens, cabbage, kale, or beans where possible.',
+                style: GoogleFonts.poppins(fontSize: 13)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1008,6 +1265,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         _recognitionResult = result;
         _isAnalyzing = false;
       });
+      _scheduleMealTargetCheck();
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -1048,6 +1306,13 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       _showError(
           'No foods found. Please add foods from the dropdown below the results.');
       return;
+    }
+
+    if (_mealWarnings.isNotEmpty) {
+      final proceed = await _showMealWarningDialog();
+      if (!proceed) {
+        return;
+      }
     }
 
     setState(() => _isSaving = true);
@@ -1269,6 +1534,9 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
           ),
           const SizedBox(height: 16),
 
+          _buildMealGuidanceCard(),
+          const SizedBox(height: 16),
+
           // Detected foods
           Text(
             'Detected Foods',
@@ -1445,6 +1713,118 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                   highlight ? AppColors.primaryGreen : AppColors.textSecondary,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMealGuidanceCard() {
+    if (_mealTargetCheckResult == null &&
+        _recognitionResult == null &&
+        _additionalFoods.isEmpty &&
+        _additionalIngredients.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final progress = _mealProgress;
+
+    Widget progressBar(String label, dynamic value) {
+      final percent =
+          value is num ? (value.toDouble() / 100.0).clamp(0.0, 1.0) : 0.0;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, fontWeight: FontWeight.w500)),
+                Text(
+                    '${(value is num ? value.toDouble() : 0.0).toStringAsFixed(0)}%',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: percent,
+                minHeight: 6,
+                backgroundColor: AppColors.inputBorder,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardFill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.health_and_safety, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              Text('Meal guidance',
+                  style: GoogleFonts.poppins(
+                      fontSize: 15, fontWeight: FontWeight.w600)),
+              if (_isCheckingMealTargets) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
+            ],
+          ),
+          if (_mealWarnings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ..._mealWarnings.map(
+              (warning) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('• $warning',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.error)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          progressBar('Sodium', progress['sodium_percent']),
+          progressBar('Saturated fat', progress['saturated_fat_percent']),
+          progressBar('Fiber', progress['fiber_percent']),
+          progressBar('Carbs', progress['carbs_percent']),
+          const SizedBox(height: 8),
+          Text(
+            'Today\'s sodium: ${(progress['sodium_percent'] as num?)?.toStringAsFixed(0) ?? '0'}% used',
+            style: GoogleFonts.poppins(
+                fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            ApiConstants.nutritionDisclaimer,
+            style: GoogleFonts.poppins(
+                fontSize: 11, color: AppColors.textSecondary, height: 1.4),
+          ),
+          if (_mealTargetCheckError != null) ...[
+            const SizedBox(height: 8),
+            Text(_mealTargetCheckError!,
+                style:
+                    GoogleFonts.poppins(fontSize: 11, color: AppColors.error)),
+          ],
         ],
       ),
     );

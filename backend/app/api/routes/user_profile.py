@@ -51,6 +51,13 @@ async def create_my_profile(
 
     # 1. Update the profile data (since row already exists via trigger)
     profile_data = payload.model_dump(mode='json', exclude={"health_condition_ids"}, exclude_unset=True)
+    profile_data.update({
+        "has_diabetes": payload.has_diabetes,
+        "has_hypertension": payload.has_hypertension,
+        "has_high_cholesterol": payload.has_high_cholesterol,
+        "diabetes_type": payload.diabetes_type,
+        "latest_hba1c": payload.latest_hba1c,
+    })
 
     result = supabase.table("profiles").update(profile_data).eq("id", user_id).execute()
     

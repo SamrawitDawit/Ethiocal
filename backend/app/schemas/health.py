@@ -22,3 +22,34 @@ class HealthConditionResponse(HealthConditionBase):
 
     class Config:
         from_attributes = True
+
+
+class ConditionProfileFlags(BaseModel):
+    has_diabetes: bool = False
+    has_hypertension: bool = False
+    has_high_cholesterol: bool = False
+    diabetes_type: Literal["Type 1", "Type 2"] | None = None
+    latest_hba1c: float | None = Field(None, gt=0)
+
+
+class MealNutrientsInput(BaseModel):
+    calories: float = 0.0
+    carbs_g: float = 0.0
+    saturated_fat_g: float = 0.0
+    sodium_mg: float = 0.0
+    fiber_g: float = 0.0
+    protein_g: float = 0.0
+
+
+class MealTargetCheckRequest(BaseModel):
+    meal_nutrients: MealNutrientsInput
+
+
+class MealTargetCheckResponse(BaseModel):
+    warnings: list[str]
+    disclaimer: str
+    note: str | None = None
+    targets: dict
+    current_daily_totals: dict
+    projected_daily_totals: dict
+    progress: dict

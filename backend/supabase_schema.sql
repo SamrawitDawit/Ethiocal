@@ -28,6 +28,11 @@ create table if not exists public.profiles (
     weight              float check (weight > 0 or weight is null),
     activity_level      text check (activity_level in ('Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active') or activity_level is null),
     daily_calorie_goal  float default 2000.0,
+    has_diabetes        boolean default false,
+    has_hypertension    boolean default false,
+    has_high_cholesterol boolean default false,
+    diabetes_type       text check (diabetes_type in ('Type 1', 'Type 2') or diabetes_type is null),
+    latest_hba1c        float check (latest_hba1c > 0 or latest_hba1c is null),
     created_at          timestamptz default now(),
     updated_at          timestamptz default now()
 );
@@ -143,6 +148,7 @@ create table if not exists public.food_items (
     carbohydrates           float default 0.0,
     protein                 float default 0.0,
     fat                     float default 0.0,
+    saturated_fat_g         float default 0.0,
     fiber                   float default 0.0,
     sodium_mg               float default 0.0,
     sugar                   float default 0.0,
@@ -186,6 +192,9 @@ create table if not exists public.ingredients (
     carbohydrates           float default 0.0,
     protein                 float default 0.0,
     fat                     float default 0.0,
+    saturated_fat_g         float default 0.0,
+    fiber                   float default 0.0,
+    sodium_mg               float default 0.0,
     created_at              timestamptz default now()
 );
 

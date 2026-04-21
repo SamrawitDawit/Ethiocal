@@ -23,6 +23,7 @@ class FoodItemCreate(BaseModel):
     carbohydrates: float = 0.0
     protein: float = 0.0
     fat: float = 0.0
+    saturated_fat_g: float = 0.0
     fiber: float = 0.0
     sodium_mg: float = 0.0
     sugar: float = 0.0
@@ -42,6 +43,7 @@ class FoodItemUpdate(BaseModel):
     carbohydrates: float | None = None
     protein: float | None = None
     fat: float | None = None
+    saturated_fat_g: float | None = None
     fiber: float | None = None
     source: str | None = None
 
@@ -58,6 +60,7 @@ class FoodItemResponse(BaseModel):
     carbohydrates: float
     protein: float
     fat: float
+    saturated_fat_g: float = 0.0
     fiber: float
     sodium_mg: float = 0.0
     sugar: float = 0.0
@@ -78,6 +81,7 @@ class IngredientCreate(BaseModel):
     carbohydrates: float = 0.0
     protein: float = 0.0
     fat: float = 0.0
+    saturated_fat_g: float = 0.0
     fiber: float = 0.0
     sodium_mg: float = 0.0
     sugar: float = 0.0
@@ -94,6 +98,7 @@ class IngredientResponse(BaseModel):
     carbohydrates: float
     protein: float
     fat: float
+    saturated_fat_g: float = 0.0
     fiber: float
     sodium_mg: float = 0.0
     sugar: float = 0.0

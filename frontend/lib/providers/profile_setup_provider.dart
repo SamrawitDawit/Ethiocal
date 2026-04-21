@@ -10,6 +10,11 @@ class ProfileSetupProvider extends ChangeNotifier {
   String _activityLevel = 'Sedentary';
   int _dailyCalorieGoal = 2000;
   String _goal = 'maintain'; // 'lose_weight', 'maintain', 'gain_weight'
+  bool _hasDiabetes = false;
+  bool _hasHypertension = false;
+  bool _hasHighCholesterol = false;
+  String? _diabetesType;
+  double? _latestHbA1c;
 
   // Step 2: Body Measurements
   double _height = 170;
@@ -33,6 +38,11 @@ class ProfileSetupProvider extends ChangeNotifier {
   String get activityLevel => _activityLevel;
   int get dailyCalorieGoal => _dailyCalorieGoal;
   String get goal => _goal;
+  bool get hasDiabetes => _hasDiabetes;
+  bool get hasHypertension => _hasHypertension;
+  bool get hasHighCholesterol => _hasHighCholesterol;
+  String? get diabetesType => _diabetesType;
+  double? get latestHbA1c => _latestHbA1c;
   double get height => _height;
   String get heightUnit => _heightUnit;
   double get weight => _weight;
@@ -75,6 +85,52 @@ class ProfileSetupProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setHasDiabetes(bool value) {
+    _hasDiabetes = value;
+    _setConditionSelectionByName('diabetes', value);
+    if (!value) {
+      _diabetesType = null;
+      _latestHbA1c = null;
+    }
+    notifyListeners();
+  }
+
+  void setHasHypertension(bool value) {
+    _hasHypertension = value;
+    _setConditionSelectionByName('hypertension', value);
+    notifyListeners();
+  }
+
+  void setHasHighCholesterol(bool value) {
+    _hasHighCholesterol = value;
+    _setConditionSelectionByName('cholesterol', value);
+    notifyListeners();
+  }
+
+  void _setConditionSelectionByName(String term, bool isSelected) {
+    if (_healthConditions.isEmpty) return;
+
+    final lowerTerm = term.toLowerCase();
+    _healthConditions = _healthConditions.map((condition) {
+      final name = condition.conditionName.toLowerCase();
+      final matches = name.contains(lowerTerm) ||
+          (lowerTerm == 'cholesterol' &&
+              (name.contains('cholestrol') || name.contains('heart disease')));
+      if (!matches) return condition;
+      return condition.copyWith(isSelected: isSelected);
+    }).toList();
+  }
+
+  void setDiabetesType(String? value) {
+    _diabetesType = value;
+    notifyListeners();
+  }
+
+  void setLatestHbA1c(double? value) {
+    _latestHbA1c = value;
+    notifyListeners();
+  }
+
   // Calculate and update daily calorie goal based on current profile data
   void _calculateAndUpdateDailyCalorieGoal() {
     // Only calculate if we have valid height and weight
@@ -95,6 +151,11 @@ class ProfileSetupProvider extends ChangeNotifier {
       weightUnit: _weightUnit,
       activityLevel: _activityLevel,
       dailyCalorieGoal: _dailyCalorieGoal,
+      hasDiabetes: _hasDiabetes,
+      hasHypertension: _hasHypertension,
+      hasHighCholesterol: _hasHighCholesterol,
+      diabetesType: _diabetesType,
+      latestHbA1c: _latestHbA1c,
       healthConditionIds: selectedHealthConditionIds,
       goal: _goal,
     );
@@ -132,6 +193,9 @@ class ProfileSetupProvider extends ChangeNotifier {
     try {
       final conditions = await ProfileService.getHealthConditions();
       _healthConditions = conditions;
+      _setConditionSelectionByName('diabetes', _hasDiabetes);
+      _setConditionSelectionByName('hypertension', _hasHypertension);
+      _setConditionSelectionByName('cholesterol', _hasHighCholesterol);
     } catch (e) {
       _healthConditionsError = e.toString();
     } finally {
@@ -189,6 +253,11 @@ class ProfileSetupProvider extends ChangeNotifier {
       weightUnit: _weightUnit,
       activityLevel: _activityLevel,
       dailyCalorieGoal: _dailyCalorieGoal,
+      hasDiabetes: _hasDiabetes,
+      hasHypertension: _hasHypertension,
+      hasHighCholesterol: _hasHighCholesterol,
+      diabetesType: _diabetesType,
+      latestHbA1c: _latestHbA1c,
       healthConditionIds: selectedHealthConditionIds,
       goal: _goal,
     );

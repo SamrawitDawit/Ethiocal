@@ -5,10 +5,21 @@ import 'api_service.dart';
 class ProfileService {
   static Future<Map<String, dynamic>> getCurrentProfile() async {
     try {
-      final response = await ApiService.get('/api/v1/users/me', requireAuth: true);
+      final response =
+          await ApiService.get('/api/v1/users/me', requireAuth: true);
       return response;
     } catch (e) {
       throw Exception('Failed to load profile: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getProfileDetails() async {
+    try {
+      final response =
+          await ApiService.get('/api/v1/user-profile/me', requireAuth: true);
+      return response;
+    } catch (e) {
+      throw Exception('Failed to load profile details: $e');
     }
   }
 
@@ -19,9 +30,11 @@ class ProfileService {
     try {
       final body = <String, dynamic>{};
       if (fullName != null) body['full_name'] = fullName;
-      if (languagePreference != null) body['language_preference'] = languagePreference;
+      if (languagePreference != null)
+        body['language_preference'] = languagePreference;
 
-      final response = await ApiService.patch('/api/v1/users/me', body, requireAuth: true);
+      final response =
+          await ApiService.patch('/api/v1/users/me', body, requireAuth: true);
       return response;
     } catch (e) {
       throw Exception('Failed to update basic profile: $e');
@@ -35,6 +48,11 @@ class ProfileService {
     double? weight,
     String? activityLevel,
     double? dailyCalorieGoal,
+    bool? hasDiabetes,
+    bool? hasHypertension,
+    bool? hasHighCholesterol,
+    String? diabetesType,
+    double? latestHbA1c,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -43,18 +61,72 @@ class ProfileService {
       if (height != null) body['height'] = height;
       if (weight != null) body['weight'] = weight;
       if (activityLevel != null) body['activity_level'] = activityLevel;
-      if (dailyCalorieGoal != null) body['daily_calorie_goal'] = dailyCalorieGoal;
+      if (dailyCalorieGoal != null)
+        body['daily_calorie_goal'] = dailyCalorieGoal;
+      if (hasDiabetes != null) body['has_diabetes'] = hasDiabetes;
+      if (hasHypertension != null) body['has_hypertension'] = hasHypertension;
+      if (hasHighCholesterol != null)
+        body['has_high_cholesterol'] = hasHighCholesterol;
+      if (diabetesType != null) body['diabetes_type'] = diabetesType;
+      if (latestHbA1c != null) body['latest_hba1c'] = latestHbA1c;
 
-      final response = await ApiService.patch('/api/v1/users/profile', body, requireAuth: true);
+      final response = await ApiService.patch('/api/v1/users/profile', body,
+          requireAuth: true);
       return response;
     } catch (e) {
       throw Exception('Failed to update profile data: $e');
     }
   }
 
+  static Future<Map<String, dynamic>> updateProfileWithHealthConditions({
+    String? fullName,
+    String? languagePreference,
+    int? age,
+    String? gender,
+    double? height,
+    double? weight,
+    String? activityLevel,
+    double? dailyCalorieGoal,
+    bool? hasDiabetes,
+    bool? hasHypertension,
+    bool? hasHighCholesterol,
+    String? diabetesType,
+    double? latestHbA1c,
+    List<String> healthConditionIds = const [],
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (fullName != null) body['full_name'] = fullName;
+      if (languagePreference != null)
+        body['language_preference'] = languagePreference;
+      if (age != null) body['age'] = age;
+      if (gender != null) body['gender'] = gender;
+      if (height != null) body['height'] = height;
+      if (weight != null) body['weight'] = weight;
+      if (activityLevel != null) body['activity_level'] = activityLevel;
+      if (dailyCalorieGoal != null)
+        body['daily_calorie_goal'] = dailyCalorieGoal;
+      if (hasDiabetes != null) body['has_diabetes'] = hasDiabetes;
+      if (hasHypertension != null) body['has_hypertension'] = hasHypertension;
+      if (hasHighCholesterol != null)
+        body['has_high_cholesterol'] = hasHighCholesterol;
+      if (diabetesType != null) body['diabetes_type'] = diabetesType;
+      if (latestHbA1c != null) body['latest_hba1c'] = latestHbA1c;
+      body['health_condition_ids'] = healthConditionIds;
+
+      final response = await ApiService.patch('/api/v1/user-profile/me', body,
+          requireAuth: true);
+      return response;
+    } catch (e) {
+      throw Exception('Failed to update profile with health conditions: $e');
+    }
+  }
+
   static Future<List<HealthCondition>> getHealthConditions() async {
     try {
-      final response = await ApiService.getList('/api/v1/users/health-conditions', requireAuth: true);
+      final response = await ApiService.getList(
+          '/api/v1/users/health-conditions',
+          requireAuth: true);
       return response.map((json) => HealthCondition.fromJson(json)).toList();
     } catch (e) {
       throw Exception('Failed to load health conditions: $e');
@@ -65,7 +137,9 @@ class ProfileService {
     required Profile profile,
   }) async {
     try {
-      final response = await ApiService.patch('/api/v1/user-profile/me', profile.toJson(), requireAuth: true);
+      final response = await ApiService.patch(
+          '/api/v1/user-profile/me', profile.toJson(),
+          requireAuth: true);
       return response;
     } catch (e) {
       throw Exception('Failed to create profile: $e');

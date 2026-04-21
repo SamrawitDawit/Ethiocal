@@ -9,6 +9,7 @@ class FoodItem {
   final double carbohydrates;
   final double protein;
   final double fat;
+  final double saturatedFatG;
   final double fiber;
   final double sodiumMg;
   final double sugar;
@@ -28,6 +29,7 @@ class FoodItem {
     required this.carbohydrates,
     required this.protein,
     required this.fat,
+    this.saturatedFatG = 0.0,
     required this.fiber,
     this.sodiumMg = 0.0,
     this.sugar = 0.0,
@@ -51,6 +53,7 @@ class FoodItem {
       carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
       protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
       fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
+      saturatedFatG: (json['saturated_fat_g'] as num?)?.toDouble() ?? 0.0,
       fiber: (json['fiber'] as num?)?.toDouble() ?? 0.0,
       sodiumMg: (json['sodium_mg'] as num?)?.toDouble() ?? 0.0,
       sugar: (json['sugar'] as num?)?.toDouble() ?? 0.0,
@@ -72,6 +75,9 @@ class Ingredient {
   final double carbohydrates;
   final double protein;
   final double fat;
+  final double saturatedFatG;
+  final double fiber;
+  final double sodiumMg;
   final String createdAt;
 
   Ingredient({
@@ -84,6 +90,9 @@ class Ingredient {
     required this.carbohydrates,
     required this.protein,
     required this.fat,
+    this.saturatedFatG = 0.0,
+    this.fiber = 0.0,
+    this.sodiumMg = 0.0,
     required this.createdAt,
   });
 
@@ -100,6 +109,9 @@ class Ingredient {
       carbohydrates: (json['carbohydrates'] as num?)?.toDouble() ?? 0.0,
       protein: (json['protein'] as num?)?.toDouble() ?? 0.0,
       fat: (json['fat'] as num?)?.toDouble() ?? 0.0,
+      saturatedFatG: (json['saturated_fat_g'] as num?)?.toDouble() ?? 0.0,
+      fiber: (json['fiber'] as num?)?.toDouble() ?? 0.0,
+      sodiumMg: (json['sodium_mg'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] ?? '',
     );
   }
@@ -118,6 +130,9 @@ class SelectedFoodItem {
   double get totalProtein => foodItem.protein * quantity;
   double get totalCarbs => foodItem.carbohydrates * quantity;
   double get totalFat => foodItem.fat * quantity;
+  double get totalSaturatedFatG => foodItem.saturatedFatG * quantity;
+  double get totalFiber => foodItem.fiber * quantity;
+  double get totalSodiumMg => foodItem.sodiumMg * quantity;
 }
 
 class SelectedIngredient {
@@ -130,6 +145,12 @@ class SelectedIngredient {
   });
 
   double get totalCalories => ingredient.caloriesPerServing * quantity;
+  double get totalProtein => ingredient.protein * quantity;
+  double get totalCarbs => ingredient.carbohydrates * quantity;
+  double get totalFat => ingredient.fat * quantity;
+  double get totalSaturatedFatG => ingredient.saturatedFatG * quantity;
+  double get totalFiber => ingredient.fiber * quantity;
+  double get totalSodiumMg => ingredient.sodiumMg * quantity;
 }
 
 class FoodItemIngredient {
