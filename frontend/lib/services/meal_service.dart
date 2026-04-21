@@ -116,4 +116,13 @@ class MealService {
         .map((e) => FoodItemIngredient.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  static Future<Map<String, dynamic>> checkMealAgainstTargets(
+      Map<String, dynamic> mealNutrients) async {
+    return ApiService.post(
+      ApiConstants.mealCheckEndpoint,
+      {'meal_nutrients': mealNutrients},
+      requireAuth: true,
+    );
+  }
 }

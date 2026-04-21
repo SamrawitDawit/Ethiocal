@@ -13,6 +13,11 @@ class User {
   final double? weight;
   final String? activityLevel;
   final double dailyCalorieGoal;
+  final bool hasDiabetes;
+  final bool hasHypertension;
+  final bool hasHighCholesterol;
+  final String? diabetesType;
+  final double? latestHbA1c;
 
   User({
     required this.id,
@@ -28,6 +33,11 @@ class User {
     this.weight,
     this.activityLevel,
     this.dailyCalorieGoal = 2000.0,
+    this.hasDiabetes = false,
+    this.hasHypertension = false,
+    this.hasHighCholesterol = false,
+    this.diabetesType,
+    this.latestHbA1c,
   });
 
   bool get isAdmin => role == 'admin';
@@ -46,10 +56,18 @@ class User {
       createdAt: json['created_at'] ?? '',
       age: json['age'],
       gender: json['gender'],
-      height: json['height'] != null ? (json['height'] as num).toDouble() : null,
-      weight: json['weight'] != null ? (json['weight'] as num).toDouble() : null,
+      height:
+          json['height'] != null ? (json['height'] as num).toDouble() : null,
+      weight:
+          json['weight'] != null ? (json['weight'] as num).toDouble() : null,
       activityLevel: json['activity_level'],
-      dailyCalorieGoal: (json['daily_calorie_goal'] as num?)?.toDouble() ?? 2000.0,
+      dailyCalorieGoal:
+          (json['daily_calorie_goal'] as num?)?.toDouble() ?? 2000.0,
+      hasDiabetes: json['has_diabetes'] ?? false,
+      hasHypertension: json['has_hypertension'] ?? false,
+      hasHighCholesterol: json['has_high_cholesterol'] ?? false,
+      diabetesType: json['diabetes_type'],
+      latestHbA1c: (json['latest_hba1c'] as num?)?.toDouble(),
     );
   }
 }

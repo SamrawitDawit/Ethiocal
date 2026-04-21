@@ -26,6 +26,10 @@ class _MealEntryPageState extends State<MealEntryPage> {
   bool _isFetchingData = true;
   String? _createdMealId;
   double _mealBaseCalories = 0.0; // Calories from step 1 (food items)
+  Map<String, dynamic>? _mealTargetCheckResult;
+  bool _isCheckingMealTargets = false;
+  String? _mealTargetCheckError;
+  int _mealTargetCheckVersion = 0;
 
   // Standard ingredients for selected foods (aggregated by ingredient ID)
   Map<String, double> _standardIngredients = {};
@@ -53,12 +57,118 @@ class _MealEntryPageState extends State<MealEntryPage> {
           _isFetchingData = false;
         });
       }
+      _scheduleMealTargetCheck();
     } catch (e) {
       if (mounted) {
         setState(() => _isFetchingData = false);
         _showError('Failed to load food data. Please try again.');
       }
     }
+  }
+
+  void _scheduleMealTargetCheck() {
+    if (_selectedFoods.isEmpty && _selectedIngredients.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _mealTargetCheckResult = null;
+          _mealTargetCheckError = null;
+        });
+      }
+      return;
+    }
+
+    final currentVersion = ++_mealTargetCheckVersion;
+    setState(() {
+      _isCheckingMealTargets = true;
+      _mealTargetCheckError = null;
+    });
+
+    MealService.checkMealAgainstTargets(_mealNutrientsPayload).then((result) {
+      if (!mounted || currentVersion != _mealTargetCheckVersion) {
+        return;
+      }
+      setState(() {
+        _mealTargetCheckResult = result;
+        _isCheckingMealTargets = false;
+      });
+    }).catchError((error) {
+      if (!mounted || currentVersion != _mealTargetCheckVersion) {
+        return;
+      }
+      setState(() {
+        _mealTargetCheckError = error.toString();
+        _isCheckingMealTargets = false;
+      });
+    });
+  }
+
+  List<String> get _mealWarnings {
+    final warnings = _mealTargetCheckResult?['warnings'];
+    if (warnings is List) {
+      return warnings.map((warning) => warning.toString()).toList();
+    }
+    return const [];
+  }
+
+  Map<String, dynamic> get _mealProgress {
+    final progress = _mealTargetCheckResult?['progress'];
+    if (progress is Map<String, dynamic>) {
+      return progress;
+    }
+    if (progress is Map) {
+      return Map<String, dynamic>.from(progress);
+    }
+    return {};
+  }
+
+  String? get _mealDisclaimer {
+    final disclaimer = _mealTargetCheckResult?['disclaimer'];
+    return disclaimer?.toString();
+  }
+
+  Future<bool> _showMealWarningDialog() async {
+    if (_mealWarnings.isEmpty) return true;
+
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Review meal guidance'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ..._mealWarnings.map(
+                (warning) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('• $warning'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                ApiConstants.nutritionDisclaimer,
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Edit portion'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen),
+            child: const Text('Add anyway'),
+          ),
+        ],
+      ),
+    );
+
+    return choice ?? false;
   }
 
   double get _totalFoodCalories {
@@ -90,15 +200,46 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   double get _totalProtein {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalProtein);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalProtein) +
+        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalProtein);
   }
 
   double get _totalCarbs {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalCarbs);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalCarbs) +
+        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalCarbs);
   }
 
   double get _totalFat {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFat);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFat) +
+        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalFat);
+  }
+
+  double get _totalSaturatedFatG {
+    return _selectedFoods.fold(
+            0.0, (sum, item) => sum + item.totalSaturatedFatG) +
+        _selectedIngredients.fold(
+            0.0, (sum, item) => sum + item.totalSaturatedFatG);
+  }
+
+  double get _totalFiber {
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFiber) +
+        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalFiber);
+  }
+
+  double get _totalSodiumMg {
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalSodiumMg) +
+        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalSodiumMg);
+  }
+
+  Map<String, dynamic> get _mealNutrientsPayload {
+    return {
+      'calories': _totalCalories,
+      'carbs_g': _totalCarbs,
+      'saturated_fat_g': _totalSaturatedFatG,
+      'sodium_mg': _totalSodiumMg,
+      'fiber_g': _totalFiber,
+      'protein_g': _totalProtein,
+    };
   }
 
   void _addFood(FoodItem item) {
@@ -111,6 +252,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
       }
       _selectedFoodDropdown = null;
     });
+    _scheduleMealTargetCheck();
   }
 
   void _removeFood(int index) {
@@ -121,6 +263,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
         _selectedFoods.removeAt(index);
       }
     });
+    _scheduleMealTargetCheck();
   }
 
   void _addIngredient(Ingredient item) {
@@ -134,6 +277,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
       }
       _selectedIngredientDropdown = null;
     });
+    _scheduleMealTargetCheck();
   }
 
   void _removeIngredient(int index) {
@@ -144,6 +288,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
         _selectedIngredients.removeAt(index);
       }
     });
+    _scheduleMealTargetCheck();
   }
 
   Future<void> _createMeal() async {
@@ -181,6 +326,16 @@ class _MealEntryPageState extends State<MealEntryPage> {
       _showError('Failed to log meal. Please try again.');
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _handleCreateMealPressed() async {
+    if (_mealWarnings.isNotEmpty) {
+      final proceed = await _showMealWarningDialog();
+      if (!proceed) {
+        return;
+      }
+    }
+    await _createMeal();
   }
 
   Future<void> _fetchStandardIngredients() async {
@@ -236,6 +391,16 @@ class _MealEntryPageState extends State<MealEntryPage> {
     }
   }
 
+  Future<void> _handleAddIngredientsPressed() async {
+    if (_mealWarnings.isNotEmpty) {
+      final proceed = await _showMealWarningDialog();
+      if (!proceed) {
+        return;
+      }
+    }
+    await _addIngredientsToMeal();
+  }
+
   void _finishMealEntry() {
     if (mounted) {
       Navigator.pop(context, true);
@@ -281,6 +446,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
                       if (_selectedFoods.isNotEmpty ||
                           _selectedIngredients.isNotEmpty)
                         _buildNutritionSummary(),
+                      const SizedBox(height: 16),
+                      _buildMealGuidanceCard(),
                       const SizedBox(height: 20),
                       _buildActionButtons(),
                       const SizedBox(height: 32),
@@ -910,7 +1077,9 @@ class _MealEntryPageState extends State<MealEntryPage> {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _isLoading || _selectedFoods.isEmpty ? null : _createMeal,
+          onPressed: _isLoading || _selectedFoods.isEmpty
+              ? null
+              : _handleCreateMealPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryGreen,
             foregroundColor: Colors.white,
@@ -945,7 +1114,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _addIngredientsToMeal,
+            onPressed: _isLoading ? null : _handleAddIngredientsPressed,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
@@ -988,6 +1157,129 @@ class _MealEntryPageState extends State<MealEntryPage> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildMealGuidanceCard() {
+    if (_mealTargetCheckResult == null &&
+        _selectedFoods.isEmpty &&
+        _selectedIngredients.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final progress = _mealProgress;
+    final currentTotals = _mealTargetCheckResult?['current_daily_totals'] ?? {};
+    final projectedTotals =
+        _mealTargetCheckResult?['projected_daily_totals'] ?? {};
+
+    double percentValue(dynamic value) {
+      if (value is num) {
+        return (value.toDouble() / 100.0).clamp(0.0, 1.0);
+      }
+      return 0.0;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardFill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.health_and_safety, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              Text(
+                'Meal guidance',
+                style: GoogleFonts.poppins(
+                    fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              if (_isCheckingMealTargets) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
+            ],
+          ),
+          if (_mealWarnings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ..._mealWarnings.map(
+              (warning) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('• $warning',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.error)),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _buildTargetProgressBar('Sodium', progress['sodium_percent']),
+          _buildTargetProgressBar(
+              'Saturated fat', progress['saturated_fat_percent']),
+          _buildTargetProgressBar('Fiber', progress['fiber_percent']),
+          _buildTargetProgressBar('Carbs', progress['carbs_percent']),
+          const SizedBox(height: 12),
+          Text(
+            'Today\'s sodium: ${(progress['sodium_percent'] as num?)?.toStringAsFixed(0) ?? '0'}% used',
+            style: GoogleFonts.poppins(
+                fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            ApiConstants.nutritionDisclaimer,
+            style: GoogleFonts.poppins(
+                fontSize: 11, color: AppColors.textSecondary, height: 1.4),
+          ),
+          if (_mealTargetCheckError != null) ...[
+            const SizedBox(height: 8),
+            Text(_mealTargetCheckError!,
+                style:
+                    GoogleFonts.poppins(fontSize: 11, color: AppColors.error)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTargetProgressBar(String label, dynamic value) {
+    final percent =
+        value is num ? (value.toDouble() / 100.0).clamp(0.0, 1.0) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(
+                  '${(value is num ? value.toDouble() : 0.0).toStringAsFixed(0)}%',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: percent,
+              minHeight: 6,
+              backgroundColor: AppColors.inputBorder,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

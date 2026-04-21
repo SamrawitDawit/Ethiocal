@@ -24,7 +24,12 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS height float CHECK (height > 0 OR height IS NULL),
   ADD COLUMN IF NOT EXISTS weight float CHECK (weight > 0 OR weight IS NULL),
   ADD COLUMN IF NOT EXISTS activity_level text CHECK (activity_level IN ('Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active') OR activity_level IS NULL),
-  ADD COLUMN IF NOT EXISTS daily_calorie_goal float DEFAULT 2000.0;
+  ADD COLUMN IF NOT EXISTS daily_calorie_goal float DEFAULT 2000.0,
+  ADD COLUMN IF NOT EXISTS has_diabetes boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS has_hypertension boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS has_high_cholesterol boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS diabetes_type text CHECK (diabetes_type IN ('Type 1', 'Type 2') OR diabetes_type IS NULL),
+  ADD COLUMN IF NOT EXISTS latest_hba1c float CHECK (latest_hba1c > 0 OR latest_hba1c IS NULL);
 
 
 -- =============================================

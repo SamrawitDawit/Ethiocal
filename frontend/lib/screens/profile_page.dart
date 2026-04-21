@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../providers/language_provider.dart';
 import '../providers/notification_provider.dart';
-import '../services/auth_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../services/profile_service.dart';
@@ -21,22 +20,26 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  // Form controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _calorieGoalController = TextEditingController();
-  
+  final TextEditingController _hba1cController = TextEditingController();
+
   String? _selectedGender;
   String? _selectedActivityLevel;
   String? _selectedLanguage;
+  bool _hasDiabetes = false;
+  bool _hasHypertension = false;
+  bool _hasHighCholesterol = false;
+  String? _diabetesType;
 
   final List<String> _genders = ['Male', 'Female'];
   final List<String> _activityLevels = [
     'Sedentary',
-    'Lightly Active', 
+    'Lightly Active',
     'Moderately Active',
     'Very Active'
   ];
@@ -56,18 +59,21 @@ class _ProfilePageState extends State<ProfilePage> {
     _heightController.dispose();
     _weightController.dispose();
     _calorieGoalController.dispose();
+    _hba1cController.dispose();
     super.dispose();
   }
 
   Future<void> _loadProfile() async {
     try {
       final profile = await ProfileService.getCurrentProfile();
+      if (!mounted) return;
       setState(() {
         _profile = profile;
         _populateFields();
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showErrorSnackBar('Failed to load profile: $e');
     }
@@ -76,28 +82,32 @@ class _ProfilePageState extends State<ProfilePage> {
   void _populateFields() {
     if (_profile == null) return;
 
-    _nameController.text = _profile!['full_name'] ?? '';
-    _emailController.text = _profile!['email'] ?? '';
+    _nameController.text = _profile!['full_name']?.toString() ?? '';
+    _emailController.text = _profile!['email']?.toString() ?? '';
     _ageController.text = _profile!['age']?.toString() ?? '';
     _heightController.text = _profile!['height']?.toString() ?? '';
     _weightController.text = _profile!['weight']?.toString() ?? '';
-    _calorieGoalController.text = _profile!['daily_calorie_goal']?.toString() ?? '2000';
-    
-    _selectedGender = _profile!['gender'];
-    _selectedActivityLevel = _profile!['activity_level'];
-    _selectedLanguage = _profile!['language_preference'];
+    _calorieGoalController.text =
+        _profile!['daily_calorie_goal']?.toString() ?? '2000';
+    _hba1cController.text = _profile!['latest_hba1c']?.toString() ?? '';
+
+    _selectedGender = _profile!['gender']?.toString();
+    _selectedActivityLevel = _profile!['activity_level']?.toString();
+    _selectedLanguage = _profile!['language_preference']?.toString();
+    _hasDiabetes = _profile!['has_diabetes'] == true;
+    _hasHypertension = _profile!['has_hypertension'] == true;
+    _hasHighCholesterol = _profile!['has_high_cholesterol'] == true;
+    _diabetesType = _profile!['diabetes_type']?.toString();
   }
 
   Future<void> _saveAllProfile() async {
     setState(() => _isSaving = true);
     try {
-      // Save basic profile first
       await ProfileService.updateBasicProfile(
         fullName: _nameController.text.trim(),
         languagePreference: _selectedLanguage,
       );
-      
-      // Then save profile data
+
       await ProfileService.updateProfileData(
         age: int.tryParse(_ageController.text),
         gender: _selectedGender,
@@ -105,13 +115,27 @@ class _ProfilePageState extends State<ProfilePage> {
         weight: double.tryParse(_weightController.text),
         activityLevel: _selectedActivityLevel,
         dailyCalorieGoal: double.tryParse(_calorieGoalController.text),
+        hasDiabetes: _hasDiabetes,
+        hasHypertension: _hasHypertension,
+        hasHighCholesterol: _hasHighCholesterol,
+        diabetesType: _diabetesType,
+        latestHbA1c: double.tryParse(_hba1cController.text),
       );
-      
+
+      final updatedProfile = await ProfileService.getCurrentProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = updatedProfile;
+        _populateFields();
+      });
+
       _showSuccessSnackBar('Profile updated successfully');
     } catch (e) {
       _showErrorSnackBar('Failed to update profile: $e');
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -153,32 +177,31 @@ class _ProfilePageState extends State<ProfilePage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Profile',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Profile',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                SizedBox(
-                                  width: 120,
-                                  child: _buildSaveButton(
-                                    text: 'Save Profile',
-                                    onPressed: _saveAllProfile,
+                                  const SizedBox(width: 16),
+                                  SizedBox(
+                                    width: 120,
+                                    child: _buildSaveButton(
+                                      text: 'Save Profile',
+                                      onPressed: _saveAllProfile,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                               const SizedBox(height: 24),
-                              
-                              // Basic Information Section
                               _buildSectionCard(
                                 title: 'Basic Information',
                                 icon: Icons.person,
@@ -194,23 +217,21 @@ class _ProfilePageState extends State<ProfilePage> {
                                       controller: _emailController,
                                       label: 'Email',
                                       icon: Icons.email_outlined,
-                                      enabled: false, // Email typically not editable
+                                      enabled: false,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildDropdownField(
                                       label: 'Language Preference',
                                       value: _selectedLanguage,
                                       items: _languages,
-                                      onChanged: (value) => setState(() => _selectedLanguage = value),
+                                      onChanged: (value) => setState(
+                                          () => _selectedLanguage = value),
                                       icon: Icons.language,
                                     ),
                                   ],
                                 ),
                               ),
-                              
                               const SizedBox(height: 20),
-                              
-                              // Physical Data Section
                               _buildSectionCard(
                                 title: 'Physical Data',
                                 icon: Icons.fitness_center,
@@ -227,7 +248,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                       label: 'Gender',
                                       value: _selectedGender,
                                       items: _genders,
-                                      onChanged: (value) => setState(() => _selectedGender = value),
+                                      onChanged: (value) => setState(
+                                          () => _selectedGender = value),
                                       icon: Icons.person_outline,
                                     ),
                                     const SizedBox(height: 16),
@@ -249,42 +271,81 @@ class _ProfilePageState extends State<ProfilePage> {
                                       label: 'Activity Level',
                                       value: _selectedActivityLevel,
                                       items: _activityLevels,
-                                      onChanged: (value) => setState(() => _selectedActivityLevel = value),
+                                      onChanged: (value) => setState(
+                                          () => _selectedActivityLevel = value),
                                       icon: Icons.directions_run,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildTextField(
                                       controller: _calorieGoalController,
                                       label: 'Daily Calorie Goal',
-                                      icon: Icons.local_fire_department_outlined,
+                                      icon:
+                                          Icons.local_fire_department_outlined,
                                       keyboardType: TextInputType.number,
                                     ),
                                   ],
                                 ),
                               ),
-                              
                               const SizedBox(height: 20),
-                              
-                              // Health Conditions Section (Placeholder)
                               _buildSectionCard(
                                 title: 'Health Conditions',
                                 icon: Icons.medical_services,
                                 child: Column(
                                   children: [
-                                    const Text(
-                                      'Health conditions management coming soon',
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 14,
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text('Diabetes'),
+                                      value: _hasDiabetes,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _hasDiabetes = value;
+                                          if (!value) {
+                                            _diabetesType = null;
+                                            _hba1cController.clear();
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    if (_hasDiabetes) ...[
+                                      const SizedBox(height: 8),
+                                      _buildDropdownField(
+                                        label: 'Diabetes Type',
+                                        value: _diabetesType,
+                                        items: const ['Type 1', 'Type 2'],
+                                        onChanged: (value) => setState(
+                                            () => _diabetesType = value),
+                                        icon: Icons.monitor_heart_outlined,
                                       ),
+                                      const SizedBox(height: 16),
+                                      _buildTextField(
+                                        controller: _hba1cController,
+                                        label: 'Latest HbA1c',
+                                        icon: Icons.health_and_safety,
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text('Hypertension'),
+                                      value: _hasHypertension,
+                                      onChanged: (value) => setState(
+                                          () => _hasHypertension = value),
+                                    ),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text('High Cholesterol'),
+                                      value: _hasHighCholesterol,
+                                      onChanged: (value) => setState(
+                                          () => _hasHighCholesterol = value),
                                     ),
                                   ],
                                 ),
                               ),
-                              
                               const SizedBox(height: 20),
-                              
-                              // App Settings Section
                               _buildSectionCard(
                                 title: 'App Settings',
                                 icon: Icons.settings,
@@ -297,8 +358,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                         builder: (context, provider, _) {
                                           if (provider.unreadCount > 0) {
                                             return Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 2,
+                                              ),
                                               decoration: BoxDecoration(
                                                 color: AppColors.error,
                                                 borderRadius:
@@ -431,20 +495,24 @@ class _ProfilePageState extends State<ProfilePage> {
           size: 20,
         ),
         filled: true,
-        fillColor: enabled ? Colors.white : AppColors.textSecondary.withOpacity(0.1),
+        fillColor:
+            enabled ? Colors.white : AppColors.textSecondary.withOpacity(0.1),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
+          borderSide:
+              BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
+          borderSide:
+              BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primaryGreen),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
@@ -509,17 +577,20 @@ class _ProfilePageState extends State<ProfilePage> {
           fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
+            borderSide:
+                BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
+            borderSide:
+                BorderSide(color: AppColors.textSecondary.withOpacity(0.3)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primaryGreen),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
     );
@@ -558,32 +629,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               textAlign: TextAlign.center,
             ),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: () {
-          Navigator.pushReplacementNamed(context, RouteNames.landing);
-        },
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.error,
-          side: const BorderSide(color: AppColors.error),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: Text(
-          'Logout',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
     );
   }
 

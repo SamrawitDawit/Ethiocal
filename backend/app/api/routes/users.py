@@ -54,6 +54,11 @@ async def setup_profile(
         "weight": payload.weight,
         "activity_level": payload.activity_level,
         "daily_calorie_goal": payload.daily_calorie_goal,
+        "has_diabetes": payload.has_diabetes,
+        "has_hypertension": payload.has_hypertension,
+        "has_high_cholesterol": payload.has_high_cholesterol,
+        "diabetes_type": payload.diabetes_type,
+        "latest_hba1c": payload.latest_hba1c,
     }
 
     result = (

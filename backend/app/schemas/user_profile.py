@@ -18,6 +18,11 @@ class UserProfileBase(BaseModel):
     weight_unit: Optional[Literal["kg", "lbs"]] = None
     activity_level: Optional[Literal["Sedentary", "Lightly Active", "Moderately Active", "Very Active"]] = None
     daily_calorie_goal: Optional[float] = Field(None, gt=0)
+    has_diabetes: Optional[bool] = False
+    has_hypertension: Optional[bool] = False
+    has_high_cholesterol: Optional[bool] = False
+    diabetes_type: Optional[Literal["Type 1", "Type 2"]] = None
+    latest_hba1c: Optional[float] = Field(None, gt=0)
 
 class UserProfileUpdate(UserProfileBase):
     """Payload for updating profile. Inherits fields + adds health_condition_ids."""

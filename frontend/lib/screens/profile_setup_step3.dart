@@ -5,7 +5,7 @@ import '../constants/app_constants.dart';
 import '../providers/profile_setup_provider.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
-import '../widgets/health_condition_card.dart';
+import '../widgets/custom_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/step_indicator.dart';
 
@@ -17,17 +17,26 @@ class ProfileSetupStep3 extends StatefulWidget {
 }
 
 class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
+  final TextEditingController _hba1cController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProfileSetupProvider>(context, listen: false).loadHealthConditions();
+      Provider.of<ProfileSetupProvider>(context, listen: false)
+          .loadHealthConditions();
     });
+  }
+
+  @override
+  void dispose() {
+    _hba1cController.dispose();
+    super.dispose();
   }
 
   Future<void> _submitProfile(ProfileSetupProvider provider) async {
     final success = await provider.submitProfile();
-    
+
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -109,48 +118,109 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 32),
-
+                const SizedBox(height: 20),
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
-                    if (provider.isLoadingHealthConditions)
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primaryGreen,
-                        ),
-                      );
-
-                    if (provider.healthConditionsError.isNotEmpty)
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.error),
-                        ),
-                        child: Text(
-                          'Error loading health conditions: ${provider.healthConditionsError}',
-                          style: GoogleFonts.poppins(
-                            color: AppColors.error,
-                            fontSize: 14,
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      );
-
-                    return Column(
-                      children: provider.healthConditions.map((condition) {
-                        return HealthConditionCard(
-                          condition: condition,
-                          onTap: () => provider.toggleHealthCondition(condition.id),
-                        );
-                      }).toList(),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dietary Health Flags',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Quick yes/no answers for diet guidance.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Do you have diabetes?'),
+                            value: provider.hasDiabetes,
+                            onChanged: provider.setHasDiabetes,
+                          ),
+                          if (provider.hasDiabetes) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: AppColors.inputFill,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: AppColors.inputBorder),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  hint: const Text('Select diabetes type'),
+                                  value: provider.diabetesType,
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: 'Type 1', child: Text('Type 1')),
+                                    DropdownMenuItem(
+                                        value: 'Type 2', child: Text('Type 2')),
+                                  ],
+                                  onChanged: provider.setDiabetesType,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            CustomTextField(
+                              controller: _hba1cController,
+                              hintText: 'Latest HbA1c (optional)',
+                              prefixIcon: Icons.monitor_heart_outlined,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              onChanged: (value) {
+                                provider.setLatestHbA1c(double.tryParse(value));
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Do you have hypertension?'),
+                            value: provider.hasHypertension,
+                            onChanged: provider.setHasHypertension,
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Do you have high cholesterol?'),
+                            value: provider.hasHighCholesterol,
+                            onChanged: provider.setHasHighCholesterol,
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
-
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
-                    if (!provider.isLoadingHealthConditions && 
+                    if (!provider.isLoadingHealthConditions &&
                         provider.healthConditionsError.isEmpty) {
                       return Column(
                         children: [
