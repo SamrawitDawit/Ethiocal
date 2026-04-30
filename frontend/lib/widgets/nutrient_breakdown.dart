@@ -19,7 +19,6 @@ class NutrientBreakdown extends StatelessWidget {
     final protein = nutrientBreakdown!['totalProtein'] as double? ?? 0.0;
     final carbs = nutrientBreakdown!['totalCarbohydrates'] as double? ?? 0.0;
     final fat = nutrientBreakdown!['totalFat'] as double? ?? 0.0;
-    final calories = nutrientBreakdown!['totalCalories'] as double? ?? 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

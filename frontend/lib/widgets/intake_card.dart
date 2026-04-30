@@ -55,8 +55,6 @@ class IntakeCard extends StatelessWidget {
       final calories = data['calories'] as int;
       final target = data['target'] as int;
 
-      final progress = (calories / target).clamp(0.0, 1.0);
-      final remainingCalories = target - calories;
 
       return Column(
         children: [
@@ -99,9 +97,6 @@ class IntakeCard extends StatelessWidget {
       );
     }
 
-    // TODAY VIEW
-    final progress = (todayCalories / targetCalories).clamp(0.0, 1.0);
-    final remainingCalories = targetCalories - todayCalories;
 
     return Column(
       children: [

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 
 /// Painter for drawing bounding boxes around detected food items
 class BoundingBoxPainter extends CustomPainter {

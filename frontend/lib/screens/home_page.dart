@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
-import '../providers/language_provider.dart';
 import '../services/auth_service.dart';
 import '../services/dashboard_service.dart';
 import '../widgets/app_background.dart';
@@ -138,7 +136,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = context.watch<LanguageProvider>();
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -182,9 +179,9 @@ class _HomePageState extends State<HomePage> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.1),
+                            color: AppColors.error.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [

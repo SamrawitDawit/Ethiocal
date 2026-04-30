@@ -11,7 +11,6 @@ import 'screens/history_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/food_recognition_page.dart';
 import 'screens/stats_page.dart';
-import 'screens/leaderboard_page.dart';
 import 'screens/profile_setup_step1.dart';
 import 'screens/profile_setup_step2.dart';
 import 'screens/profile_setup_step2_2.dart';

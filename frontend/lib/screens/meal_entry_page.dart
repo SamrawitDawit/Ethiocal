@@ -1168,9 +1168,6 @@ class _MealEntryPageState extends State<MealEntryPage> {
     }
 
     final progress = _mealProgress;
-    final currentTotals = _mealTargetCheckResult?['current_daily_totals'] ?? {};
-    final projectedTotals =
-        _mealTargetCheckResult?['projected_daily_totals'] ?? {};
 
     double percentValue(dynamic value) {
       if (value is num) {
