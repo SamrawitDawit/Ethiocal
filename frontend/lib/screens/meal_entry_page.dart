@@ -14,14 +14,13 @@ class MealEntryPage extends StatefulWidget {
 }
 
 class _MealEntryPageState extends State<MealEntryPage> {
-  // Step tracking: 1 = Food selection, 2 = Optional ingredients
+  // Step tracking: 1 = Food selection, 2 = Optional ingredients per food item
   int _currentStep = 1;
 
   String _selectedMealType = 'breakfast';
   List<FoodItem> _foodItems = [];
   List<Ingredient> _ingredients = [];
   List<SelectedFoodItem> _selectedFoods = [];
-  List<SelectedIngredient> _selectedIngredients = [];
   bool _isLoading = false;
   bool _isFetchingData = true;
   String? _createdMealId;
@@ -31,12 +30,18 @@ class _MealEntryPageState extends State<MealEntryPage> {
   String? _mealTargetCheckError;
   int _mealTargetCheckVersion = 0;
 
-  // Standard ingredients for selected foods (aggregated by ingredient ID)
-  Map<String, double> _standardIngredients = {};
+  // Standard ingredients per food item (food_item_id -> list of standard ingredients)
+  Map<String, List<FoodItemIngredient>> _standardIngredientsPerFood = {};
+
+  // User's ingredient adjustments per food item (food_item_id -> ingredient_id -> selected ingredient)
+  Map<String, Map<String, SelectedIngredientPerFood>> _userAdjustmentsPerFood = {};
 
   // Dropdown selections
   FoodItem? _selectedFoodDropdown;
   Ingredient? _selectedIngredientDropdown;
+
+  // Currently editing food item in step 2
+  String? _editingFoodItemId;
 
   final List<String> _mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -67,7 +72,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   void _scheduleMealTargetCheck() {
-    if (_selectedFoods.isEmpty && _selectedIngredients.isEmpty) {
+    if (_selectedFoods.isEmpty) {
       if (mounted) {
         setState(() {
           _mealTargetCheckResult = null;
@@ -175,20 +180,16 @@ class _MealEntryPageState extends State<MealEntryPage> {
     return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalCalories);
   }
 
-  // Calculate adjusted ingredient calories based on standard ingredients
+  /// Calculate total ingredient calories based on per-food-item adjustments
   double get _adjustedIngredientCalories {
     double total = 0.0;
-    for (final item in _selectedIngredients) {
-      final standardQty = _standardIngredients[item.ingredient.id] ?? 0.0;
-      final quantityDiff = item.quantity - standardQty;
-      total += quantityDiff * item.ingredient.caloriesPerServing;
+    for (final foodEntry in _userAdjustmentsPerFood.entries) {
+      for (final ingEntry in foodEntry.value.entries) {
+        final selected = ingEntry.value;
+        total += selected.adjustedCalories;
+      }
     }
     return total;
-  }
-
-  // Get standard quantity for display
-  double _getStandardQuantity(String ingredientId) {
-    return _standardIngredients[ingredientId] ?? 0.0;
   }
 
   double get _totalCalories {
@@ -200,35 +201,28 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   double get _totalProtein {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalProtein) +
-        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalProtein);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalProtein);
   }
 
   double get _totalCarbs {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalCarbs) +
-        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalCarbs);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalCarbs);
   }
 
   double get _totalFat {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFat) +
-        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalFat);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFat);
   }
 
   double get _totalSaturatedFatG {
     return _selectedFoods.fold(
-            0.0, (sum, item) => sum + item.totalSaturatedFatG) +
-        _selectedIngredients.fold(
             0.0, (sum, item) => sum + item.totalSaturatedFatG);
   }
 
   double get _totalFiber {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFiber) +
-        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalFiber);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalFiber);
   }
 
   double get _totalSodiumMg {
-    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalSodiumMg) +
-        _selectedIngredients.fold(0.0, (sum, item) => sum + item.totalSodiumMg);
+    return _selectedFoods.fold(0.0, (sum, item) => sum + item.totalSodiumMg);
   }
 
   Map<String, dynamic> get _mealNutrientsPayload {
@@ -256,39 +250,67 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   void _removeFood(int index) {
+    final foodId = _selectedFoods[index].foodItem.id;
     setState(() {
       if (_selectedFoods[index].quantity > 1) {
         _selectedFoods[index].quantity -= 1;
       } else {
         _selectedFoods.removeAt(index);
+        // Clean up any ingredient adjustments for this food item
+        _userAdjustmentsPerFood.remove(foodId);
+        _standardIngredientsPerFood.remove(foodId);
       }
     });
     _scheduleMealTargetCheck();
   }
 
   void _addIngredient(Ingredient item) {
-    final existing =
-        _selectedIngredients.indexWhere((e) => e.ingredient.id == item.id);
-    setState(() {
-      if (existing >= 0) {
-        _selectedIngredients[existing].quantity += 1;
+    // When editing a specific food item
+    if (_editingFoodItemId != null) {
+      final foodAdjustments = _userAdjustmentsPerFood[_editingFoodItemId!] ?? {};
+      final existingKey = foodAdjustments.keys.firstWhere(
+        (key) => key == item.id,
+        orElse: () => '',
+      );
+
+      if (existingKey.isNotEmpty) {
+        foodAdjustments[existingKey]!.quantity += 1;
       } else {
-        _selectedIngredients.add(SelectedIngredient(ingredient: item));
+        // Get standard quantity for this ingredient in this food
+        final stdIngredients = _standardIngredientsPerFood[_editingFoodItemId!] ?? [];
+        final stdIng = stdIngredients.firstWhere(
+          (si) => si.ingredientId == item.id,
+          orElse: () => FoodItemIngredient(
+            id: '',
+            foodItemId: '',
+            ingredientId: item.id,
+            standardQuantity: 0,
+            createdAt: '',
+          ),
+        );
+        foodAdjustments[item.id] = SelectedIngredientPerFood(
+          ingredient: item,
+          quantity: 1.0,
+          standardQuantity: stdIng.standardQuantity,
+        );
       }
-      _selectedIngredientDropdown = null;
-    });
+      _userAdjustmentsPerFood[_editingFoodItemId!] = foodAdjustments;
+    }
+    setState(() {});
     _scheduleMealTargetCheck();
   }
 
-  void _removeIngredient(int index) {
-    setState(() {
-      if (_selectedIngredients[index].quantity > 1) {
-        _selectedIngredients[index].quantity -= 1;
+  void _removeIngredient(String foodItemId, String ingredientId) {
+    final foodAdjustments = _userAdjustmentsPerFood[foodItemId];
+    if (foodAdjustments != null && foodAdjustments.containsKey(ingredientId)) {
+      if (foodAdjustments[ingredientId]!.quantity > 1) {
+        foodAdjustments[ingredientId]!.quantity -= 1;
       } else {
-        _selectedIngredients.removeAt(index);
+        foodAdjustments.remove(ingredientId);
       }
-    });
-    _scheduleMealTargetCheck();
+      setState(() {});
+      _scheduleMealTargetCheck();
+    }
   }
 
   Future<void> _createMeal() async {
@@ -308,17 +330,29 @@ class _MealEntryPageState extends State<MealEntryPage> {
       _createdMealId = response.id;
       _mealBaseCalories = response.totalCalories;
 
-      // Fetch standard ingredients for all selected food items
-      await _fetchStandardIngredients();
+      // Store the meal_food_item_id for each selected food
+      for (var i = 0; i < response.foodItems.length; i++) {
+        final mealFoodItem = response.foodItems[i];
+        _selectedFoods[i].mealFoodItemId = mealFoodItem.id;
+      }
 
-      // Move to step 2 (optional ingredients)
+      // Fetch standard ingredients for all selected food items
+      await _fetchStandardIngredientsPerFood();
+
+      // Initialize user adjustments with standard quantities
+      _initializeUserAdjustments();
+
+      // Move to step 2 (optional ingredients per food item)
       setState(() {
         _currentStep = 2;
         _isLoading = false;
+        if (_selectedFoods.isNotEmpty) {
+          _editingFoodItemId = _selectedFoods.first.foodItem.id;
+        }
       });
 
       _showSuccess(
-          'Food logged! ${response.totalCalories.toStringAsFixed(0)} calories. Add ingredients?');
+          'Food logged! ${response.totalCalories.toStringAsFixed(0)} calories. Adjust ingredients per dish?');
     } on ApiException catch (e) {
       _showError(e.message);
       setState(() => _isLoading = false);
@@ -338,66 +372,97 @@ class _MealEntryPageState extends State<MealEntryPage> {
     await _createMeal();
   }
 
-  Future<void> _fetchStandardIngredients() async {
-    _standardIngredients = {};
+  Future<void> _fetchStandardIngredientsPerFood() async {
+    _standardIngredientsPerFood = {};
 
     for (final selectedFood in _selectedFoods) {
       try {
         final stdIngredients = await MealService.getFoodItemStandardIngredients(
             selectedFood.foodItem.id);
 
-        for (final stdIng in stdIngredients) {
-          // Scale by the quantity of food items selected
-          final scaledQty = stdIng.standardQuantity * selectedFood.quantity;
-          if (_standardIngredients.containsKey(stdIng.ingredientId)) {
-            _standardIngredients[stdIng.ingredientId] =
-                _standardIngredients[stdIng.ingredientId]! + scaledQty;
-          } else {
-            _standardIngredients[stdIng.ingredientId] = scaledQty;
-          }
-        }
+        // Scale standard quantities by the number of servings selected
+        final scaledIngredients = stdIngredients.map((ing) {
+          return FoodItemIngredient(
+            id: ing.id,
+            foodItemId: ing.foodItemId,
+            ingredientId: ing.ingredientId,
+            standardQuantity: ing.standardQuantity * selectedFood.quantity,
+            ingredient: ing.ingredient,
+            createdAt: ing.createdAt,
+          );
+        }).toList();
+
+        _standardIngredientsPerFood[selectedFood.foodItem.id] = scaledIngredients;
       } catch (_) {
         // Silently ignore errors fetching standard ingredients
+        _standardIngredientsPerFood[selectedFood.foodItem.id] = [];
       }
+    }
+  }
+
+  void _initializeUserAdjustments() {
+    _userAdjustmentsPerFood = {};
+
+    for (final selectedFood in _selectedFoods) {
+      final foodId = selectedFood.foodItem.id;
+      final stdIngredients = _standardIngredientsPerFood[foodId] ?? [];
+
+      final adjustments = <String, SelectedIngredientPerFood>{};
+      for (final stdIng in stdIngredients) {
+        if (stdIng.ingredient != null) {
+          adjustments[stdIng.ingredientId] = SelectedIngredientPerFood(
+            ingredient: stdIng.ingredient!,
+            quantity: stdIng.standardQuantity, // Start with standard quantity
+            standardQuantity: stdIng.standardQuantity,
+          );
+        }
+      }
+      _userAdjustmentsPerFood[foodId] = adjustments;
     }
   }
 
   Future<void> _addIngredientsToMeal() async {
     if (_createdMealId == null) return;
 
-    if (_selectedIngredients.isEmpty) {
-      // Skip if no ingredients selected
-      _finishMealEntry();
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
-      final response = await MealService.addIngredientsToMeal(
+      // Build the request payload with per-food-item ingredients
+      final foodItemIngredients = <Map<String, dynamic>>[];
+
+      for (final selectedFood in _selectedFoods) {
+        if (selectedFood.mealFoodItemId == null) continue;
+
+        final foodAdjustments = _userAdjustmentsPerFood[selectedFood.foodItem.id];
+        if (foodAdjustments != null) {
+          for (final ing in foodAdjustments.values) {
+            foodItemIngredients.add({
+              'meal_food_item_id': selectedFood.mealFoodItemId,
+              'ingredient_id': ing.ingredient.id,
+              'quantity': ing.quantity,
+            });
+          }
+        }
+      }
+
+      final response = await MealService.addFoodItemIngredientsToMeal(
         mealId: _createdMealId!,
-        ingredients: _selectedIngredients,
+        foodItemIngredients: foodItemIngredients,
       );
 
       _showSuccess(
-          'Ingredients added! Total: ${response.newTotalCalories.toStringAsFixed(0)} calories');
+          'Ingredients saved! Total: ${(response['new_total_calories'] as num).toStringAsFixed(0)} calories');
       _finishMealEntry();
     } on ApiException catch (e) {
       _showError(e.message);
       setState(() => _isLoading = false);
     } catch (_) {
-      _showError('Failed to add ingredients. Please try again.');
+      _showError('Failed to save ingredients. Please try again.');
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleAddIngredientsPressed() async {
-    if (_mealWarnings.isNotEmpty) {
-      final proceed = await _showMealWarningDialog();
-      if (!proceed) {
-        return;
-      }
-    }
     await _addIngredientsToMeal();
   }
 
@@ -440,11 +505,10 @@ class _MealEntryPageState extends State<MealEntryPage> {
                         const SizedBox(height: 20),
                         _buildFoodSelection(),
                       ] else ...[
-                        _buildIngredientSelection(),
+                        _buildIngredientSelectionPerFood(),
                       ],
                       const SizedBox(height: 20),
-                      if (_selectedFoods.isNotEmpty ||
-                          _selectedIngredients.isNotEmpty)
+                      if (_selectedFoods.isNotEmpty)
                         _buildNutritionSummary(),
                       const SizedBox(height: 16),
                       _buildMealGuidanceCard(),
@@ -767,7 +831,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
     );
   }
 
-  Widget _buildIngredientSelection() {
+  Widget _buildIngredientSelectionPerFood() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -784,7 +848,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Adjust cooking ingredients. Standard amounts are already included in the food\'s calories. Only the difference will be added/subtracted.',
+                  'Adjust cooking ingredients per dish. Standard amounts are included in each dish\'s calories.',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: AppColors.textPrimary,
@@ -796,7 +860,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
         ),
         const SizedBox(height: 16),
         Text(
-          'Add Cooking Ingredients',
+          'Select a dish to adjust its ingredients',
           style: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -804,23 +868,253 @@ class _MealEntryPageState extends State<MealEntryPage> {
           ),
         ),
         const SizedBox(height: 10),
-        _buildIngredientDropdown(),
+        // Food item selector tabs
+        _buildFoodItemSelector(),
         const SizedBox(height: 16),
-        if (_selectedIngredients.isNotEmpty) ...[
-          Text(
-            'Selected Ingredients',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ..._selectedIngredients.asMap().entries.map((entry) {
-            return _buildSelectedIngredientCard(entry.key, entry.value);
-          }),
+        // Show ingredients for selected food item
+        if (_editingFoodItemId != null) ...[
+          _buildIngredientSectionForFood(),
         ],
       ],
+    );
+  }
+
+  Widget _buildFoodItemSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _selectedFoods.map((food) {
+          final isSelected = _editingFoodItemId == food.foodItem.id;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _editingFoodItemId = food.foodItem.id;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primaryGreen
+                    : AppColors.inputFill,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primaryGreen
+                      : AppColors.inputBorder,
+                ),
+              ),
+              child: Text(
+                food.foodItem.name,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildIngredientSectionForFood() {
+    final foodAdjustments = _userAdjustmentsPerFood[_editingFoodItemId] ?? {};
+    final selectedFood = _selectedFoods.firstWhere(
+      (f) => f.foodItem.id == _editingFoodItemId,
+      orElse: () => SelectedFoodItem(foodItem: FoodItem(
+        id: '',
+        name: '',
+        standardServingSize: 100,
+        caloriesPerServing: 0,
+        carbohydrates: 0,
+        protein: 0,
+        fat: 0,
+        fiber: 0,
+        createdAt: '',
+      )),
+    );
+
+    // Calculate total adjusted calories for this food
+    double foodIngredientCalories = 0.0;
+    for (final adj in foodAdjustments.values) {
+      foodIngredientCalories += adj.adjustedCalories;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Ingredients for ${selectedFood.foodItem.name}',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: foodIngredientCalories >= 0
+                    ? AppColors.primaryGreen.withOpacity(0.2)
+                    : AppColors.error.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${foodIngredientCalories >= 0 ? '+' : ''}${foodIngredientCalories.toStringAsFixed(0)} cal',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: foodIngredientCalories >= 0
+                      ? AppColors.darkGreen
+                      : AppColors.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (foodAdjustments.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.inputFill,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    color: AppColors.textSecondary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No standard ingredients for this dish. Add extras?',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...foodAdjustments.entries.map((entry) {
+            return _buildIngredientAdjustmentCard(
+              _editingFoodItemId!,
+              entry.value,
+            );
+          }),
+        const SizedBox(height: 12),
+        // Add extra ingredient dropdown
+        _buildIngredientDropdown(),
+      ],
+    );
+  }
+
+  Widget _buildIngredientAdjustmentCard(
+    String foodItemId,
+    SelectedIngredientPerFood adjustment,
+  ) {
+    final diff = adjustment.quantity - adjustment.standardQuantity;
+    final adjustedCalories = adjustment.adjustedCalories;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.blobYellow.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.blobYellow),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  adjustment.ingredient.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (adjustment.ingredient.nameAmharic != null)
+                  Text(
+                    adjustment.ingredient.nameAmharic!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      'Standard: ${adjustment.standardQuantity.toStringAsFixed(1)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    if (diff != 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: diff > 0
+                              ? AppColors.error.withOpacity(0.2)
+                              : AppColors.primaryGreen.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${diff > 0 ? '+' : ''}${diff.toStringAsFixed(1)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: diff > 0
+                                ? AppColors.error
+                                : AppColors.darkGreen,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  '${adjustedCalories >= 0 ? '+' : ''}${adjustedCalories.toStringAsFixed(0)} cal',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: adjustedCalories >= 0
+                        ? AppColors.darkGreen
+                        : AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildQuantityControl(
+            quantity: adjustment.quantity,
+            onDecrease: () => _removeIngredient(foodItemId, adjustment.ingredient.id),
+            onIncrease: () {
+              setState(() {
+                adjustment.quantity += 1;
+              });
+              _scheduleMealTargetCheck();
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -836,7 +1130,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
         child: DropdownButton<Ingredient>(
           isExpanded: true,
           hint: Text(
-            'Choose an ingredient...',
+            'Add extra ingredient...',
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -844,6 +1138,11 @@ class _MealEntryPageState extends State<MealEntryPage> {
           ),
           value: _selectedIngredientDropdown,
           items: _ingredients.map((ing) {
+            // Filter out ingredients already in adjustments
+            final existing = _userAdjustmentsPerFood[_editingFoodItemId] ?? {};
+            if (existing.containsKey(ing.id)) {
+              return null;
+            }
             return DropdownMenuItem<Ingredient>(
               value: ing,
               child: Row(
@@ -882,81 +1181,16 @@ class _MealEntryPageState extends State<MealEntryPage> {
                 ],
               ),
             );
-          }).toList(),
+          }).whereType<DropdownMenuItem<Ingredient>>().toList(),
           onChanged: (ing) {
             if (ing != null) {
               _addIngredient(ing);
+              setState(() {
+                _selectedIngredientDropdown = null;
+              });
             }
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedIngredientCard(int index, SelectedIngredient item) {
-    final standardQty = _getStandardQuantity(item.ingredient.id);
-    final quantityDiff = item.quantity - standardQty;
-    final adjustedCalories = quantityDiff * item.ingredient.caloriesPerServing;
-    final isStandard = standardQty > 0;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.blobYellow.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.blobYellow),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.ingredient.name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (item.ingredient.nameAmharic != null)
-                  Text(
-                    item.ingredient.nameAmharic!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                if (isStandard)
-                  Text(
-                    'Standard: ${standardQty.toStringAsFixed(1)} servings',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                Text(
-                  '${adjustedCalories >= 0 ? '+' : ''}${adjustedCalories.toStringAsFixed(0)} cal',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: adjustedCalories >= 0
-                        ? AppColors.darkGreen
-                        : AppColors.error,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildQuantityControl(
-            quantity: item.quantity,
-            onDecrease: () => _removeIngredient(index),
-            onIncrease: () => _addIngredient(item.ingredient),
-          ),
-        ],
       ),
     );
   }
@@ -1099,7 +1333,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
                   ),
                 )
               : Text(
-                  'Next: Add Ingredients (Optional)',
+                  'Next: Adjust Ingredients',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1134,9 +1368,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
                     ),
                   )
                 : Text(
-                    _selectedIngredients.isEmpty
-                        ? 'Skip & Finish'
-                        : 'Add Ingredients & Finish',
+                    'Save & Finish',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1144,37 +1376,26 @@ class _MealEntryPageState extends State<MealEntryPage> {
                   ),
           ),
         ),
-        if (_selectedIngredients.isEmpty) ...[
-          const SizedBox(height: 10),
-          Text(
-            'You can skip this step if you don\'t want to add cooking ingredients.',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              fontStyle: FontStyle.italic,
-            ),
-            textAlign: TextAlign.center,
+        const SizedBox(height: 10),
+        Text(
+          'Standard ingredient quantities will be used for any dishes not adjusted.',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontStyle: FontStyle.italic,
           ),
-        ],
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
 
   Widget _buildMealGuidanceCard() {
-    if (_mealTargetCheckResult == null &&
-        _selectedFoods.isEmpty &&
-        _selectedIngredients.isEmpty) {
+    if (_mealTargetCheckResult == null && _selectedFoods.isEmpty) {
       return const SizedBox.shrink();
     }
 
     final progress = _mealProgress;
-
-    double percentValue(dynamic value) {
-      if (value is num) {
-        return (value.toDouble() / 100.0).clamp(0.0, 1.0);
-      }
-      return 0.0;
-    }
 
     return Container(
       width: double.infinity,

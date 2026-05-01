@@ -1,11 +1,12 @@
 # ============================================
 # EthioCal — Meal Routes
 # ============================================
-# POST /                  — create meal with food items
-# POST /{id}/ingredients  — add ingredients to meal (optional)
-# GET  /                  — user's meal history
-# GET  /{id}              — get single meal
-# DELETE /{id}            — delete a meal
+# POST /                        — create meal with food items
+# POST /{id}/ingredients       — add ingredients to meal (optional, legacy)
+# POST /{id}/food-item-ingredients — add ingredients per food item (new)
+# GET  /                        — user's meal history
+# GET  /{id}                   — get single meal
+# DELETE /{id}                 — delete a meal
 # ============================================
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
@@ -16,6 +17,9 @@ from app.schemas.meal import (
     MealCreateResponse,
     MealAddIngredients,
     MealAddIngredientsResponse,
+    MealAddFoodItemIngredients,
+    MealAddFoodItemIngredientsResponse,
+    MealFoodItemIngredientEntry,
     MealResponse,
 )
 from app.services.daily_summary_service import DailySummaryService
@@ -176,6 +180,8 @@ async def add_ingredients_to_meal(
     """Add cooking ingredients to an existing meal (optional).
 
     Step 2 of meal logging - optionally specify cooking ingredients.
+    This is the legacy endpoint that aggregates ingredients across all food items.
+    For per-food-item ingredient tracking, use the /food-item-ingredients endpoint.
 
     Ingredient adjustment logic:
     - If the ingredient is a standard ingredient for any food item in the meal,
@@ -311,6 +317,203 @@ async def add_ingredients_to_meal(
     )
 
 
+@router.post("/{meal_id}/food-item-ingredients", response_model=MealAddFoodItemIngredientsResponse)
+async def add_food_item_ingredients(
+    meal_id: str,
+    payload: MealAddFoodItemIngredients,
+    current_user: dict = Depends(get_current_user),
+):
+    """Add cooking ingredients PER FOOD ITEM to an existing meal (optional).
+
+    Step 2 of meal logging - optionally specify cooking ingredients.
+
+    This is the new per-food-item approach where ingredient adjustments
+    are tracked separately for each food item in the meal.
+
+    Example:
+    - Doro Wot has standard 2 oil servings
+    - Shiro has standard 1 oil serving
+    - User adjusts Doro Wot to 1 oil (difference: -1, deduct calories for 1 oil)
+    - User adjusts Shiro to 2 oil (difference: +1, add calorie for 1 oil)
+    - Each adjustment is calculated independently
+    """
+    if not payload.food_item_ingredients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one ingredient is required.",
+        )
+
+    supabase = get_supabase_admin()
+    user_id = current_user["id"]
+
+    # Verify meal exists and belongs to user
+    meal_result = (
+        supabase.table("meals")
+        .select("*")
+        .eq("id", meal_id)
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not meal_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meal not found.",
+        )
+
+    meal = meal_result.data
+
+    # Get all meal_food_items for this meal
+    meal_food_items_result = (
+        supabase.table("meal_food_items")
+        .select("id, food_item_id, quantity")
+        .eq("meal_id", meal_id)
+        .execute()
+    )
+
+    # Create maps for quick lookup
+    meal_food_item_map = {mfi["id"]: mfi for mfi in meal_food_items_result.data}
+    meal_food_item_ids = [mfi["id"] for mfi in meal_food_items_result.data]
+    food_item_ids = [mfi["food_item_id"] for mfi in meal_food_items_result.data]
+
+    # Validate all meal_food_item_ids exist
+    for item in payload.food_item_ingredients:
+        if item.meal_food_item_id not in meal_food_item_map:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Meal food item {item.meal_food_item_id} not found in this meal.",
+            )
+
+    # Fetch all ingredients
+    ingredient_ids = list(set([ing.ingredient_id for ing in payload.food_item_ingredients]))
+    ing_result = (
+        supabase.table("ingredients")
+        .select("*")
+        .in_("id", ingredient_ids)
+        .execute()
+    )
+    ing_map = {i["id"]: i for i in ing_result.data}
+
+    # Validate all ingredients exist
+    missing = [iid for iid in ingredient_ids if iid not in ing_map]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ingredients not found: {missing}",
+        )
+
+    # Get standard ingredients for all food items in this meal
+    # key: (food_item_id, ingredient_id) -> standard_quantity
+    std_ingredients_map = {}
+    if food_item_ids:
+        std_ing_result = (
+            supabase.table("food_item_ingredients")
+            .select("*")
+            .in_("food_item_id", food_item_ids)
+            .execute()
+        )
+        for std in std_ing_result.data:
+            key = (std["food_item_id"], std["ingredient_id"])
+            std_ingredients_map[key] = std["quantity_grams"]
+
+    # Process each ingredient adjustment per food item
+    added_calories = 0.0
+    food_item_ingredients_response = []
+
+    # First, collect all ingredients for each meal_food_item to handle updates
+    existing_mfi_ingredients = {}
+    if meal_food_item_ids:
+        existing_result = (
+            supabase.table("meal_food_item_ingredients")
+            .select("*")
+            .in_("meal_food_item_id", meal_food_item_ids)
+            .execute()
+        )
+        for row in existing_result.data:
+            key = (row["meal_food_item_id"], row["ingredient_id"])
+            existing_mfi_ingredients[key] = row
+
+    for item in payload.food_item_ingredients:
+        meal_food_item = meal_food_item_map[item.meal_food_item_id]
+        food_item_id = meal_food_item["food_item_id"]
+        food_qty = meal_food_item["quantity"]  # Number of servings of this food
+
+        # Get standard quantity for this ingredient in this food item
+        key = (food_item_id, item.ingredient_id)
+        std_qty_per_serving = std_ingredients_map.get(key, 0.0)
+        # Scale standard quantity by number of servings
+        standard_qty = std_qty_per_serving * food_qty
+
+        user_quantity = item.quantity
+        ingredient = ing_map[item.ingredient_id]
+
+        # Calculate the difference from standard
+        quantity_diff = user_quantity - standard_qty
+
+        # Calculate calories based on the difference
+        # Positive diff = more used, add calories
+        # Negative diff = less used, deduct calories
+        ing_calories = (quantity_diff / 100.0) * ingredient["calories_per_100g"]
+        added_calories += ing_calories
+
+        # Check if this ingredient already exists for this meal_food_item
+        existing_key = (item.meal_food_item_id, item.ingredient_id)
+
+        if existing_key in existing_mfi_ingredients:
+            # Update existing record
+            existing_record = existing_mfi_ingredients[existing_key]
+            result = (
+                supabase.table("meal_food_item_ingredients")
+                .update({
+                    "quantity": user_quantity,
+                    "standard_quantity": standard_qty,
+                    "quantity_diff": quantity_diff,
+                    "total_calories": ing_calories,
+                })
+                .eq("id", existing_record["id"])
+                .execute()
+            )
+            ing_data = result.data[0]
+        else:
+            # Insert new record
+            result = (
+                supabase.table("meal_food_item_ingredients")
+                .insert({
+                    "meal_id": meal_id,
+                    "meal_food_item_id": item.meal_food_item_id,
+                    "ingredient_id": item.ingredient_id,
+                    "quantity": user_quantity,
+                    "standard_quantity": standard_qty,
+                    "quantity_diff": quantity_diff,
+                    "total_calories": ing_calories,
+                })
+                .execute()
+            )
+            ing_data = result.data[0]
+
+        ing_data["ingredient"] = ingredient
+        food_item_ingredients_response.append(ing_data)
+
+    # Update meal total calories
+    new_total = meal["total_calories"] + added_calories
+    supabase.table("meals").update({"total_calories": new_total}).eq("id", meal_id).execute()
+
+    # Update daily summary
+    await DailySummaryService.update_daily_summary(
+        user_id=user_id,
+        meal_date=datetime.fromisoformat(meal["created_at"]).date(),
+        operation="upsert"
+    )
+
+    return MealAddFoodItemIngredientsResponse(
+        meal_id=meal_id,
+        food_item_ingredients=food_item_ingredients_response,
+        added_calories=added_calories,
+        new_total_calories=new_total,
+    )
+
+
 @router.get("/", response_model=list[MealResponse])
 async def get_meal_history(
     skip: int = Query(0, ge=0),
@@ -345,24 +548,35 @@ async def get_meal_history(
 
     meals = []
     for meal in meals_result.data:
+        meal_id = meal["id"]
+
         # Get food items for this meal
         food_items_result = (
             supabase.table("meal_food_items")
             .select("*, food_item:food_items(*)")
-            .eq("meal_id", meal["id"])
+            .eq("meal_id", meal_id)
             .execute()
         )
 
-        # Get ingredients for this meal
+        # Get legacy generic ingredients for this meal
         ingredients_result = (
             supabase.table("meal_ingredients")
             .select("*, ingredient:ingredients(*)")
-            .eq("meal_id", meal["id"])
+            .eq("meal_id", meal_id)
+            .execute()
+        )
+
+        # Get per-food-item ingredients for this meal
+        food_item_ingredients_result = (
+            supabase.table("meal_food_item_ingredients")
+            .select("*, ingredient:ingredients(*)")
+            .eq("meal_id", meal_id)
             .execute()
         )
 
         meal["food_items"] = food_items_result.data
         meal["ingredients"] = ingredients_result.data
+        meal["food_item_ingredients"] = food_item_ingredients_result.data
         meals.append(meal)
 
     return meals
@@ -377,38 +591,38 @@ async def get_meal_food_items_by_date(
     try:
         print("=" * 50)
         print("Endpoint reached")
-        
+
         # Check if current_user exists
         if not current_user:
             print("ERROR: current_user is None")
             return {"meal_food_items": [], "error": "No user found"}
-        
+
         print(f"current_user type: {type(current_user)}")
         print(f"current_user keys: {current_user.keys() if isinstance(current_user, dict) else 'Not a dict'}")
-        
+
         # Safely get user_id
         user_id = None
         if isinstance(current_user, dict):
             user_id = current_user.get("user_id") or current_user.get("id")
-        
+
         print(f"Using user_id: {user_id}")
         print(f"Date requested: {date}")
-        
+
         if not user_id:
             print("ERROR: No user_id found in current_user")
             return {"meal_food_items": [], "error": "No user_id in token"}
-        
+
         # Initialize Supabase
         print("Initializing Supabase...")
         supabase = get_supabase_admin()
-        
+
         # Parse date range
         query_date = datetime.strptime(date, '%Y-%m-%d')
         start_datetime = query_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_datetime = query_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-        
+
         print(f"Date range: {start_datetime} to {end_datetime}")
-        
+
         # Get meals - use try-except for the query
         try:
             print("Executing meals query...")
@@ -424,14 +638,14 @@ async def get_meal_food_items_by_date(
         except Exception as e:
             print(f"Meals query failed: {str(e)}")
             return {"meal_food_items": [], "error": f"Meals query failed: {str(e)}"}
-        
+
         if not meals_result.data:
             print("No meals found for this user/date")
             return {"meal_food_items": []}
-        
+
         meal_ids = [meal["id"] for meal in meals_result.data]
         print(f"Meal IDs: {meal_ids}")
-        
+
         # Get meal_food_items
         try:
             print("Executing meal_food_items query...")
@@ -445,10 +659,10 @@ async def get_meal_food_items_by_date(
         except Exception as e:
             print(f"meal_food_items query failed: {str(e)}")
             return {"meal_food_items": [], "error": f"Items query failed: {str(e)}"}
-        
+
         print("=" * 50)
         return {"meal_food_items": result.data if result.data else []}
-        
+
     except Exception as e:
         print(f"UNEXPECTED ERROR: {str(e)}")
         print(traceback.format_exc())
@@ -465,17 +679,17 @@ async def get_daily_nutrients(
         print(f"\n=== get_daily_nutrients called ===")
         print(f"Date: {date}")
         print(f"User: {current_user.get('id')}")
-        
+
         supabase = get_supabase_admin()
         user_id = current_user["id"]
-        
+
         # Parse date range
         query_date = datetime.strptime(date, '%Y-%m-%d')
         start_datetime = query_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_datetime = query_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-        
+
         print(f"Date range: {start_datetime} to {end_datetime}")
-        
+
         # Get meals for the date
         meals_result = (
             supabase.table("meals")
@@ -485,26 +699,26 @@ async def get_daily_nutrients(
             .lte("created_at", end_datetime.isoformat())
             .execute()
         )
-        
+
         print(f"Meals found: {len(meals_result.data) if meals_result.data else 0}")
-        
+
         # Calculate totals from meals directly
         total_calories = 0.0
         total_protein = 0.0
         total_carbs = 0.0
         total_fat = 0.0
         meal_count = 0
-        
+
         if meals_result.data:
             meal_count = len(meals_result.data)
-            
+
             # Sum calories from meals
             for meal in meals_result.data:
                 total_calories += meal.get("total_calories", 0)
-            
+
             # Get all meal IDs
             meal_ids = [meal["id"] for meal in meals_result.data]
-            
+
             # Get food items for these meals
             try:
                 food_items_result = (
@@ -522,27 +736,27 @@ async def get_daily_nutrients(
                     .in_("meal_id", meal_ids)
                     .execute()
                 )
-                
+
                 print(f"Food items found: {len(food_items_result.data) if food_items_result.data else 0}")
-                
+
                 # Calculate nutrient totals
                 for item in (food_items_result.data or []):
                     quantity = item.get("quantity", 1)
                     food_item = item.get("food_item")
-                    
+
                     if food_item:
                         # Calculate based on quantity and standard serving size
                         # Assuming standard_serving_size is 100g if not specified
                         serving_multiplier = quantity
-                        
+
                         total_protein += (food_item.get("protein", 0) * serving_multiplier)
                         total_carbs += (food_item.get("carbohydrates", 0) * serving_multiplier)
                         total_fat += (food_item.get("fat", 0) * serving_multiplier)
-                        
+
             except Exception as e:
                 print(f"Error getting food items: {e}")
                 # Continue with just calorie totals
-        
+
         response_data = {
             "date": date,
             "total_protein": round(total_protein, 1),
@@ -551,12 +765,12 @@ async def get_daily_nutrients(
             "total_calories": round(total_calories, 1),
             "meal_count": meal_count
         }
-        
+
         print(f"Response: {response_data}")
         print("=== get_daily_nutrients completed ===\n")
-        
+
         return response_data
-        
+
     except Exception as e:
         print(f"ERROR in get_daily_nutrients: {str(e)}")
         import traceback
@@ -565,7 +779,7 @@ async def get_daily_nutrients(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get daily nutrients: {str(e)}"
         )
-    
+
 @router.get("/{meal_id}", response_model=MealResponse)
 async def get_meal(
     meal_id: str,
@@ -599,7 +813,7 @@ async def get_meal(
         .execute()
     )
 
-    # Get ingredients
+    # Get legacy generic ingredients
     ingredients_result = (
         supabase.table("meal_ingredients")
         .select("*, ingredient:ingredients(*)")
@@ -607,8 +821,17 @@ async def get_meal(
         .execute()
     )
 
+    # Get per-food-item ingredients
+    food_item_ingredients_result = (
+        supabase.table("meal_food_item_ingredients")
+        .select("*, ingredient:ingredients(*)")
+        .eq("meal_id", meal_id)
+        .execute()
+    )
+
     meal["food_items"] = food_items_result.data
     meal["ingredients"] = ingredients_result.data
+    meal["food_item_ingredients"] = food_item_ingredients_result.data
 
     return meal
 
@@ -640,7 +863,7 @@ async def delete_meal(
     meal_date = datetime.fromisoformat(meal_result.data["created_at"]).date()
     user_id = current_user["id"]
 
-    # Delete cascades to meal_food_items and meal_ingredients
+    # Delete cascades to meal_food_items, meal_ingredients, and meal_food_item_ingredients
     supabase.table("meals").delete().eq("id", meal_id).execute()
 
     # Update daily summary

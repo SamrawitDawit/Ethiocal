@@ -39,10 +39,10 @@ class MealFoodItemResponse(BaseModel):
     created_at: datetime
 
 
-# --- Meal Ingredient Entry ---
+# --- Meal Ingredient Entry (Legacy/Generic) ---
 
 class MealIngredientEntry(BaseModel):
-    """A cooking ingredient to add to a meal (optional)."""
+    """A cooking ingredient to add to a meal (optional) - legacy generic approach."""
     ingredient_id: str
     quantity: float = 1.0
 
@@ -53,6 +53,29 @@ class MealIngredientResponse(BaseModel):
     meal_id: str
     ingredient_id: str
     quantity: float
+    total_calories: float
+    ingredient: IngredientResponse | None = None
+    created_at: datetime
+
+
+# --- Per-Food-Item Ingredient Entry (Step 2: New approach) ---
+
+class MealFoodItemIngredientEntry(BaseModel):
+    """An ingredient adjustment for a specific food item in a meal."""
+    meal_food_item_id: str  # The ID of the meal_food_item (from meal_food_items table)
+    ingredient_id: str
+    quantity: float = 1.0  # User's actual quantity used
+
+
+class MealFoodItemIngredientResponse(BaseModel):
+    """Ingredient adjustment for a food item in a meal."""
+    id: str
+    meal_id: str
+    meal_food_item_id: str
+    ingredient_id: str
+    quantity: float
+    standard_quantity: float
+    quantity_diff: float
     total_calories: float
     ingredient: IngredientResponse | None = None
     created_at: datetime
@@ -80,10 +103,30 @@ class MealCreateResponse(BaseModel):
     created_at: datetime
 
 
-# --- Add Ingredients (Step 2: Optional) ---
+# --- Add Ingredients (Step 2: Per-food-item approach - NEW) ---
+
+class MealAddFoodItemIngredients(BaseModel):
+    """Add cooking ingredients per food item to an existing meal (optional step 2).
+    
+    This allows ingredient adjustments to be tracked per food item.
+    For example, if Doro Wot has standard 2 oil and Shiro has standard 1 oil,
+    adjusting oil for each dish affects only that dish's calories.
+    """
+    food_item_ingredients: list[MealFoodItemIngredientEntry]
+
+
+class MealAddFoodItemIngredientsResponse(BaseModel):
+    """Response after adding per-food-item ingredients."""
+    meal_id: str
+    food_item_ingredients: list[MealFoodItemIngredientResponse]
+    added_calories: float
+    new_total_calories: float
+
+
+# --- Add Ingredients (Step 2: Legacy/Generic - kept for backwards compatibility) ---
 
 class MealAddIngredients(BaseModel):
-    """Add cooking ingredients to an existing meal (optional step)."""
+    """Add cooking ingredients to an existing meal (optional step) - legacy."""
     ingredients: list[MealIngredientEntry]
 
 
@@ -107,6 +150,7 @@ class MealResponse(BaseModel):
     image_url: str | None = None
     food_items: list[MealFoodItemResponse] = []
     ingredients: list[MealIngredientResponse] = []
+    food_item_ingredients: list[MealFoodItemIngredientResponse] = []  # Per-food-item ingredients
     created_at: datetime
 
 

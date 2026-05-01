@@ -120,10 +120,12 @@ class Ingredient {
 class SelectedFoodItem {
   final FoodItem foodItem;
   double quantity;
+  String? mealFoodItemId; // Will be set after meal creation
 
   SelectedFoodItem({
     required this.foodItem,
     this.quantity = 1.0,
+    this.mealFoodItemId,
   });
 
   double get totalCalories => foodItem.caloriesPerServing * quantity;
@@ -181,5 +183,68 @@ class FoodItemIngredient {
           : null,
       createdAt: json['created_at'] ?? '',
     );
+  }
+}
+
+/// Per-food-item ingredient adjustment for meals (from backend)
+class MealFoodItemIngredient {
+  final String id;
+  final String mealId;
+  final String mealFoodItemId;
+  final String ingredientId;
+  final double quantity;
+  final double standardQuantity;
+  final double quantityDiff;
+  final double totalCalories;
+  final Ingredient? ingredient;
+  final String createdAt;
+
+  MealFoodItemIngredient({
+    required this.id,
+    required this.mealId,
+    required this.mealFoodItemId,
+    required this.ingredientId,
+    required this.quantity,
+    required this.standardQuantity,
+    required this.quantityDiff,
+    required this.totalCalories,
+    this.ingredient,
+    required this.createdAt,
+  });
+
+  factory MealFoodItemIngredient.fromJson(Map<String, dynamic> json) {
+    return MealFoodItemIngredient(
+      id: json['id'],
+      mealId: json['meal_id'],
+      mealFoodItemId: json['meal_food_item_id'],
+      ingredientId: json['ingredient_id'],
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
+      standardQuantity: (json['standard_quantity'] as num?)?.toDouble() ?? 0.0,
+      quantityDiff: (json['quantity_diff'] as num?)?.toDouble() ?? 0.0,
+      totalCalories: (json['total_calories'] as num?)?.toDouble() ?? 0.0,
+      ingredient: json['ingredient'] != null
+          ? Ingredient.fromJson(json['ingredient'])
+          : null,
+      createdAt: json['created_at'] ?? '',
+    );
+  }
+}
+
+/// Selected ingredient adjustment for a specific food item (frontend)
+class SelectedIngredientPerFood {
+  final Ingredient ingredient;
+  double quantity;
+  double standardQuantity; // The standard amount for this ingredient in this food item
+
+  SelectedIngredientPerFood({
+    required this.ingredient,
+    this.quantity = 1.0,
+    this.standardQuantity = 1.0,
+  });
+
+  /// Calories based on the difference from standard
+  double get adjustedCalories {
+    final diff = quantity - standardQuantity;
+    return (diff / 100.0) * ingredient.caloriesPerServing;
   }
 }

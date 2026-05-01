@@ -78,6 +78,7 @@ class Meal {
   final String createdAt;
   final List<MealFoodItem> foodItems;
   final List<MealIngredient> ingredients;
+  final List<MealFoodItemIngredient> foodItemIngredients;
 
   Meal({
     required this.id,
@@ -89,6 +90,7 @@ class Meal {
     required this.createdAt,
     this.foodItems = const [],
     this.ingredients = const [],
+    this.foodItemIngredients = const [],
   });
 
   factory Meal.fromJson(Map<String, dynamic> json) {
@@ -106,6 +108,10 @@ class Meal {
           [],
       ingredients: (json['ingredients'] as List?)
               ?.map((e) => MealIngredient.fromJson(e))
+              .toList() ??
+          [],
+      foodItemIngredients: (json['food_item_ingredients'] as List?)
+              ?.map((e) => MealFoodItemIngredient.fromJson(e))
               .toList() ??
           [],
     );

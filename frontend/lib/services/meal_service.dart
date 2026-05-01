@@ -91,6 +91,30 @@ class MealService {
     return MealAddIngredientsResponse.fromJson(json);
   }
 
+  /// Add ingredients per food item to an existing meal.
+  /// Each ingredient is associated with a specific food item (meal_food_item_id).
+  /// This allows ingredient adjustments to be tracked per food item.
+  /// 
+  /// foodItemIngredients format:
+  /// [
+  ///   {'meal_food_item_id': '...', 'ingredient_id': '...', 'quantity': 1.0},
+  ///   ...
+  /// ]
+  static Future<Map<String, dynamic>> addFoodItemIngredientsToMeal({
+    required String mealId,
+    required List<Map<String, dynamic>> foodItemIngredients,
+  }) async {
+    final body = {
+      'food_item_ingredients': foodItemIngredients,
+    };
+
+    return ApiService.post(
+      '${ApiConstants.mealsEndpoint}/$mealId/food-item-ingredients',
+      body,
+      requireAuth: true,
+    );
+  }
+
   static Future<List<Meal>> getMealHistory(
       {int skip = 0, int limit = 20}) async {
     final json = await ApiService.getList(
