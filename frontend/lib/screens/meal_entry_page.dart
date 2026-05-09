@@ -842,6 +842,10 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   Widget _buildFoodItemSelector() {
+    final maxChipWidth = (MediaQuery.sizeOf(context).width * 0.45)
+        .clamp(120.0, 180.0)
+        .toDouble();
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -866,12 +870,22 @@ class _MealEntryPageState extends State<MealEntryPage> {
                       : AppColors.inputBorder,
                 ),
               ),
-              child: Text(
-                food.foodItem.name,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.white : AppColors.textSecondary,
+              child: Tooltip(
+                message: food.foodItem.name,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxChipWidth),
+                  child: Text(
+                    food.foodItem.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          isSelected ? Colors.white : AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -910,15 +924,22 @@ class _MealEntryPageState extends State<MealEntryPage> {
       children: [
         Row(
           children: [
-            Text(
-              'Ingredients for ${selectedFood.foodItem.name}',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+            Expanded(
+              child: Tooltip(
+                message: 'Ingredients for ${selectedFood.foodItem.name}',
+                child: Text(
+                  'Ingredients for ${selectedFood.foodItem.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
