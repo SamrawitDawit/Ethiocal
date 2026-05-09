@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 
 class MealBreakdown extends StatelessWidget {
   final Map<String, dynamic>? mealBreakdown;
@@ -16,18 +18,28 @@ class MealBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     if (mealBreakdown == null) return const SizedBox.shrink();
 
+    final lang = context.watch<LanguageProvider>();
+
     final mealTypes = [
-      {'type': 'breakfast', 'icon': Icons.breakfast_dining, 'label': 'Breakfast'},
-      {'type': 'lunch', 'icon': Icons.lunch_dining, 'label': 'Lunch'},
-      {'type': 'dinner', 'icon': Icons.dinner_dining, 'label': 'Dinner'},
-      {'type': 'snack', 'icon': Icons.cookie, 'label': 'Snacks'},
+      {
+        'type': 'breakfast',
+        'icon': Icons.breakfast_dining,
+        'label': lang.t('breakfast')
+      },
+      {'type': 'lunch', 'icon': Icons.lunch_dining, 'label': lang.t('lunch')},
+      {
+        'type': 'dinner',
+        'icon': Icons.dinner_dining,
+        'label': lang.t('dinner')
+      },
+      {'type': 'snack', 'icon': Icons.cookie, 'label': lang.t('snack')},
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Meal Breakdown',
+          lang.t('meal_breakdown'),
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -47,20 +59,21 @@ class MealBreakdown extends StatelessWidget {
           itemCount: mealTypes.length,
           itemBuilder: (context, index) {
             final mealType = mealTypes[index];
-            final data = mealBreakdown![mealType['type']] as Map<String, dynamic>? ?? 
-                       {'calories': 0, 'count': 0};
+            final data =
+                mealBreakdown![mealType['type']] as Map<String, dynamic>? ??
+                    {'calories': 0, 'count': 0};
             final calories = data['calories'] as int;
             final count = data['count'] as int;
-            
+
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppColors.cardFill,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: calories > 0 
-                    ? AppColors.primaryGreen.withOpacity(0.3)
-                    : AppColors.inputBorder,
+                  color: calories > 0
+                      ? AppColors.primaryGreen.withOpacity(0.3)
+                      : AppColors.inputBorder,
                   width: 1,
                 ),
               ),
@@ -71,9 +84,9 @@ class MealBreakdown extends StatelessWidget {
                     children: [
                       Icon(
                         mealType['icon'] as IconData,
-                        color: calories > 0 
-                          ? AppColors.primaryGreen 
-                          : AppColors.textSecondary,
+                        color: calories > 0
+                            ? AppColors.primaryGreen
+                            : AppColors.textSecondary,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -93,15 +106,17 @@ class MealBreakdown extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: calories > 0 
-                        ? AppColors.primaryGreen 
-                        : AppColors.textSecondary,
+                      color: calories > 0
+                          ? AppColors.primaryGreen
+                          : AppColors.textSecondary,
                     ),
                   ),
                   if (count > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '$count meal${count > 1 ? 's' : ''}',
+                      lang.isAmharic
+                          ? '$count ${lang.t('meal')}'
+                          : '$count meal${count > 1 ? 's' : ''}',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
                         color: AppColors.textSecondary,

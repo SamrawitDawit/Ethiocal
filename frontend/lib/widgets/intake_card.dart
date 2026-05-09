@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 import 'meal_breakdown.dart';
 import 'nutrient_breakdown.dart';
 
@@ -33,7 +35,9 @@ class IntakeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isShowingHistorical = selectedDate != null && !_isSameDay(selectedDate!, today);
+    final lang = context.watch<LanguageProvider>();
+    final isShowingHistorical =
+        selectedDate != null && !_isSameDay(selectedDate!, today);
 
     // LOADING HISTORICAL
     if (isLoadingHistorical) {
@@ -50,35 +54,39 @@ class IntakeCard extends StatelessWidget {
     }
 
     // HISTORICAL DATA VIEW
-    if (isShowingHistorical && historicalData != null && historicalData!.containsKey(selectedDate!)) {
+    if (isShowingHistorical &&
+        historicalData != null &&
+        historicalData!.containsKey(selectedDate!)) {
       final data = historicalData![selectedDate!]!;
       final calories = data['calories'] as int;
       final target = data['target'] as int;
-
 
       return Column(
         children: [
           _buildCircularProgress(calories, target),
           const SizedBox(height: 20),
           // NUTRIENT BREAKDOWN FOR HISTORICAL DATE
-          if (historicalData != null && 
+          if (historicalData != null &&
               historicalData!.containsKey(selectedDate!) &&
               historicalData![selectedDate!]!.containsKey('nutrientBreakdown'))
             NutrientBreakdown(
-              nutrientBreakdown: historicalData![selectedDate!]!['nutrientBreakdown'] as Map<String, dynamic>,
+              nutrientBreakdown:
+                  historicalData![selectedDate!]!['nutrientBreakdown']
+                      as Map<String, dynamic>,
               isHistorical: true,
             ),
           const SizedBox(height: 16),
           // MEAL BREAKDOWN FOR HISTORICAL DATE
-          if (historicalData != null && 
+          if (historicalData != null &&
               historicalData!.containsKey(selectedDate!) &&
               historicalData![selectedDate!]!.containsKey('mealBreakdown'))
             MealBreakdown(
-              mealBreakdown: historicalData![selectedDate!]!['mealBreakdown'] as Map<String, dynamic>,
+              mealBreakdown: historicalData![selectedDate!]!['mealBreakdown']
+                  as Map<String, dynamic>,
               isHistorical: true,
             ),
           const SizedBox(height: 16),
-          if (onBackPressed != null) _buildBackButton(),
+          if (onBackPressed != null) _buildBackButton(lang),
         ],
       );
     }
@@ -97,18 +105,16 @@ class IntakeCard extends StatelessWidget {
       );
     }
 
-
     return Column(
       children: [
         _buildCircularProgress(todayCalories, targetCalories),
         const SizedBox(height: 20),
         // NUTRIENT BREAKDOWN
-        if (nutrientBreakdown != null) 
+        if (nutrientBreakdown != null)
           NutrientBreakdown(nutrientBreakdown: nutrientBreakdown!),
         const SizedBox(height: 20),
         // MEAL BREAKDOWN
-        if (mealBreakdown != null) 
-          MealBreakdown(mealBreakdown: mealBreakdown!),
+        if (mealBreakdown != null) MealBreakdown(mealBreakdown: mealBreakdown!),
       ],
     );
   }
@@ -116,23 +122,22 @@ class IntakeCard extends StatelessWidget {
   Widget _buildCircularProgress(int calories, int target) {
     final isOverTarget = calories > target;
     final progress = (calories / target).clamp(0.0, 1.0);
-    
+
     return CircularPercentIndicator(
       radius: 90,
       lineWidth: 12,
       percent: progress,
       animation: true,
       circularStrokeCap: CircularStrokeCap.round,
-      backgroundColor: (isOverTarget ? AppColors.error : AppColors.primaryGreen).withOpacity(0.2),
+      backgroundColor: (isOverTarget ? AppColors.error : AppColors.primaryGreen)
+          .withOpacity(0.2),
       progressColor: isOverTarget ? AppColors.error : AppColors.primaryGreen,
       center: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.local_fire_department, 
-            color: isOverTarget ? AppColors.error : AppColors.primaryGreen, 
-            size: 32
-          ),
+          Icon(Icons.local_fire_department,
+              color: isOverTarget ? AppColors.error : AppColors.primaryGreen,
+              size: 32),
           const SizedBox(height: 6),
           Text(
             '$calories',
@@ -143,7 +148,7 @@ class IntakeCard extends StatelessWidget {
             ),
           ),
           Text(
-            'of $target',
+            '$calories / $target kcal',
             style: GoogleFonts.poppins(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -154,55 +159,7 @@ class IntakeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCalorieStats(int target, int remainingCalories) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Target',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            Text(
-              '$target kcal',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              remainingCalories > 0 ? 'Remaining' : 'Over',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            Text(
-              '${remainingCalories.abs()} kcal',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBackButton() {
+  Widget _buildBackButton(LanguageProvider lang) {
     return GestureDetector(
       onTap: onBackPressed,
       child: Container(
@@ -215,10 +172,11 @@ class IntakeCard extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.arrow_back, color: AppColors.primaryGreen, size: 16),
+            const Icon(Icons.arrow_back,
+                color: AppColors.primaryGreen, size: 16),
             const SizedBox(width: 4),
             Text(
-              'Back to Today',
+              lang.t('back_to_today'),
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 color: AppColors.primaryGreen,
@@ -232,7 +190,7 @@ class IntakeCard extends StatelessWidget {
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 }

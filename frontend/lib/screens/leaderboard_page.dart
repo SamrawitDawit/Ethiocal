@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../models/leaderboard_model.dart';
+import '../providers/language_provider.dart';
 import '../providers/leaderboard_provider.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
@@ -27,6 +28,8 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -41,14 +44,14 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.error_outline,
                         size: 64,
                         color: AppColors.error,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Failed to load leaderboard',
+                        lang.t('leaderboard_load_failed'),
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -60,7 +63,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                         onPressed: () {
                           provider.fetchLeaderboard();
                         },
-                        child: const Text('Retry'),
+                        child: Text(lang.t('retry')),
                       ),
                     ],
                   ),
@@ -71,7 +74,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
               if (leaderboard == null || leaderboard.entries.isEmpty) {
                 return Center(
                   child: Text(
-                    'No leaderboard data available',
+                    lang.t('no_leaderboard_data'),
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       color: AppColors.textSecondary,
@@ -97,7 +100,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Leaderboard',
+                              lang.t('leaderboard'),
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w600,
@@ -112,7 +115,7 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
 
                             // Rankings 4+
                             Text(
-                              'Rankings',
+                              lang.t('rankings'),
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

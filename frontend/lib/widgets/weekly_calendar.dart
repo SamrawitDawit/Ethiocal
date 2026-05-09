@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 
 class WeeklyCalendar extends StatefulWidget {
   final List<DateTime> weekDates;
@@ -27,6 +29,8 @@ class WeeklyCalendar extends StatefulWidget {
 class _WeeklyCalendarState extends State<WeeklyCalendar> {
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -52,13 +56,22 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
               itemBuilder: (context, index) {
                 final date = widget.weekDates[index];
                 final isToday = _isSameDay(date, widget.today);
-                final isSelected = widget.selectedDate != null && _isSameDay(date, widget.selectedDate!);
-                final isPast = date.isBefore(widget.today) && !_isSameDay(date, widget.today);
+                final isSelected = widget.selectedDate != null &&
+                    _isSameDay(date, widget.selectedDate!);
+                final isPast = date.isBefore(widget.today) &&
+                    !_isSameDay(date, widget.today);
                 final isFuture = date.isAfter(widget.today);
-                
+
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: _buildDayCard(date, isToday, isSelected, isPast, isFuture),
+                  child: _buildDayCard(
+                    lang,
+                    date,
+                    isToday,
+                    isSelected,
+                    isPast,
+                    isFuture,
+                  ),
                 );
               },
             ),
@@ -68,14 +81,21 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
     );
   }
 
-  Widget _buildDayCard(DateTime date, bool isToday, bool isSelected, bool isPast, bool isFuture) {
-    final dayName = _getDayName(date.weekday);
+  Widget _buildDayCard(
+    LanguageProvider lang,
+    DateTime date,
+    bool isToday,
+    bool isSelected,
+    bool isPast,
+    bool isFuture,
+  ) {
+    final dayName = _getDayName(lang, date.weekday);
     final dayNumber = date.day.toString();
-    
+
     Color backgroundColor;
     Color borderColor;
     Color textColor;
-    
+
     if (isSelected) {
       backgroundColor = AppColors.primaryGreen;
       borderColor = Colors.transparent;
@@ -86,10 +106,14 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
       textColor = Colors.white;
     } else {
       backgroundColor = Colors.transparent;
-      borderColor = isFuture ? AppColors.inputBorder.withOpacity(0.5) : AppColors.inputBorder;
-      textColor = isFuture ? AppColors.textSecondary.withOpacity(0.5) : AppColors.textPrimary;
+      borderColor = isFuture
+          ? AppColors.inputBorder.withOpacity(0.5)
+          : AppColors.inputBorder;
+      textColor = isFuture
+          ? AppColors.textSecondary.withOpacity(0.5)
+          : AppColors.textPrimary;
     }
-    
+
     return GestureDetector(
       onTap: isFuture ? null : () => widget.onDateTapped(date),
       child: Container(
@@ -120,7 +144,9 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
                 color: textColor,
               ),
             ),
-            if (isPast && widget.historicalData != null && widget.historicalData!.containsKey(date))
+            if (isPast &&
+                widget.historicalData != null &&
+                widget.historicalData!.containsKey(date))
               Container(
                 width: 4,
                 height: 4,
@@ -138,12 +164,20 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
-  String _getDayName(int weekday) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[weekday - 1];
+  String _getDayName(LanguageProvider lang, int weekday) {
+    const keys = [
+      'day_mon_short',
+      'day_tue_short',
+      'day_wed_short',
+      'day_thu_short',
+      'day_fri_short',
+      'day_sat_short',
+      'day_sun_short',
+    ];
+    return lang.t(keys[weekday - 1]);
   }
 }

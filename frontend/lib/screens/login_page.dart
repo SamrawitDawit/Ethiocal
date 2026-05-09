@@ -42,12 +42,6 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: AppColors.primaryGreen,
-        ),
-      );
       Navigator.pushReplacementNamed(context, RouteNames.mainNavigation);
     } on ApiException catch (e) {
       if (!mounted) return;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 
 class NutrientBreakdown extends StatelessWidget {
   final Map<String, dynamic>? nutrientBreakdown;
@@ -15,6 +17,8 @@ class NutrientBreakdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (nutrientBreakdown == null) return const SizedBox.shrink();
+
+    final lang = context.watch<LanguageProvider>();
 
     final protein = nutrientBreakdown!['totalProtein'] as double? ?? 0.0;
     final carbs = nutrientBreakdown!['totalCarbohydrates'] as double? ?? 0.0;
@@ -43,19 +47,22 @@ class NutrientBreakdown extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildNutrientItem(
-                label: 'Protein',
+                nutrientKey: 'protein',
+                label: lang.t('protein'),
                 value: protein,
                 unit: 'g',
                 color: AppColors.primaryGreen,
               ),
               _buildNutrientItem(
-                label: 'Carbs',
+                nutrientKey: 'carbs',
+                label: lang.t('carbs'),
                 value: carbs,
                 unit: 'g',
                 color: Colors.orange,
               ),
               _buildNutrientItem(
-                label: 'Fat',
+                nutrientKey: 'fat',
+                label: lang.t('fat'),
                 value: fat,
                 unit: 'g',
                 color: Colors.red,
@@ -68,15 +75,16 @@ class NutrientBreakdown extends StatelessWidget {
   }
 
   Widget _buildNutrientItem({
+    required String nutrientKey,
     required String label,
     required double value,
     required String unit,
     required Color color,
   }) {
     // Calculate progress percentage (assuming max values: protein 100g, carbs 300g, fat 100g)
-    final maxValue = label == 'Carbs' ? 300.0 : 100.0;
+    final maxValue = nutrientKey == 'carbs' ? 300.0 : 100.0;
     final progress = (value / maxValue).clamp(0.0, 1.0);
-    
+
     return Column(
       children: [
         Text(
@@ -84,7 +92,8 @@ class NutrientBreakdown extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: value > 0 ? AppColors.textSecondary : AppColors.textSecondary,
+            color:
+                value > 0 ? AppColors.textSecondary : AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 4),
@@ -97,10 +106,11 @@ class NutrientBreakdown extends StatelessWidget {
           child: LinearProgressIndicator(
             value: progress,
             backgroundColor: AppColors.inputBorder,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              label == 'Protein' ? Colors.blue :
-              label == 'Carbs' ? Colors.yellow : Colors.red
-            ),
+            valueColor: AlwaysStoppedAnimation<Color>(nutrientKey == 'protein'
+                ? Colors.blue
+                : nutrientKey == 'carbs'
+                    ? Colors.yellow
+                    : Colors.red),
           ),
         ),
         const SizedBox(height: 4),
@@ -112,7 +122,9 @@ class NutrientBreakdown extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: value > 0 ? AppColors.textPrimary : AppColors.textSecondary,
+                  color: value > 0
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
                 ),
               ),
               TextSpan(

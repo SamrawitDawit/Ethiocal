@@ -40,28 +40,40 @@ class _HistoryPageState extends State<HistoryPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load meal history.';
+        _errorMessage = 'history_load_failed';
       });
     }
   }
 
-  String _formatMealType(String mealType) {
-    if (mealType.isEmpty) return 'Meal';
-    return mealType[0].toUpperCase() + mealType.substring(1).toLowerCase();
+  String _formatMealType(LanguageProvider lang, String mealType) {
+    switch (mealType.toLowerCase()) {
+      case 'breakfast':
+        return lang.t('breakfast');
+      case 'lunch':
+        return lang.t('lunch');
+      case 'dinner':
+        return lang.t('dinner');
+      case 'snack':
+        return lang.t('snack');
+      default:
+        return lang.t('meal');
+    }
   }
 
-  String _formatCreatedAt(String createdAt) {
+  String _formatCreatedAt(LanguageProvider lang, String createdAt) {
     final parsed = DateTime.tryParse(createdAt);
     if (parsed == null) return createdAt;
 
     final local = parsed.toLocal();
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
     final minute = local.minute.toString().padLeft(2, '0');
-    final period = local.hour >= 12 ? 'PM' : 'AM';
+    final period = local.hour >= 12
+        ? (lang.isAmharic ? 'ከሰዓት' : 'PM')
+        : (lang.isAmharic ? 'ጠዋት' : 'AM');
     return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} $hour:$minute $period';
   }
 
-  Widget _buildMealCard(Meal meal) {
+  Widget _buildMealCard(Meal meal, LanguageProvider lang) {
     final foods = meal.foodItems
         .map((item) => item.foodItem?.name)
         .whereType<String>()
@@ -94,7 +106,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  _formatMealType(meal.mealType),
+                  _formatMealType(lang, meal.mealType),
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -115,7 +127,9 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            foods.isEmpty ? 'Food details unavailable' : foods.join(', '),
+            foods.isEmpty
+                ? lang.t('food_details_unavailable')
+                : foods.join(', '),
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: AppColors.textPrimary,
@@ -123,7 +137,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            _formatCreatedAt(meal.createdAt),
+            _formatCreatedAt(lang, meal.createdAt),
             style: GoogleFonts.poppins(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -193,7 +207,7 @@ class _HistoryPageState extends State<HistoryPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              _errorMessage!,
+              lang.t(_errorMessage!),
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: AppColors.error,
@@ -251,7 +265,7 @@ class _HistoryPageState extends State<HistoryPage> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: _meals.length,
-        itemBuilder: (context, index) => _buildMealCard(_meals[index]),
+        itemBuilder: (context, index) => _buildMealCard(_meals[index], lang),
       ),
     );
   }

@@ -66,6 +66,14 @@ class LanguageProvider extends ChangeNotifier {
     'full_name': 'Full Name',
     'welcome_back': 'Welcome Back',
     'create_account': 'Create Account',
+    'male': 'Male',
+    'female': 'Female',
+    'sedentary': 'Sedentary',
+    'lightly_active': 'Lightly Active',
+    'moderately_active': 'Moderately Active',
+    'very_active': 'Very Active',
+    'type_1': 'Type 1',
+    'type_2': 'Type 2',
 
     // Home
     'this_week': 'This Week',
@@ -76,6 +84,19 @@ class LanguageProvider extends ChangeNotifier {
     'quick_actions': 'Quick Actions',
     'text_entry': 'Text Entry',
     'capture_food': 'Capture Food',
+    'dashboard_load_failed': 'Failed to load dashboard data',
+    'back_to_today': 'Back to Today',
+    'meal_breakdown': 'Meal Breakdown',
+    'protein': 'Protein',
+    'carbs': 'Carbs',
+    'fat': 'Fat',
+    'day_mon_short': 'Mon',
+    'day_tue_short': 'Tue',
+    'day_wed_short': 'Wed',
+    'day_thu_short': 'Thu',
+    'day_fri_short': 'Fri',
+    'day_sat_short': 'Sat',
+    'day_sun_short': 'Sun',
 
     // Profile
     'edit_profile': 'Edit Profile',
@@ -85,6 +106,21 @@ class LanguageProvider extends ChangeNotifier {
     'select_language': 'Select Language',
     'english': 'English',
     'amharic': 'Amharic',
+    'save_profile': 'Save Profile',
+    'basic_information': 'Basic Information',
+    'physical_data': 'Physical Data',
+    'app_settings': 'App Settings',
+    'language_preference': 'Language Preference',
+    'height_cm': 'Height (cm)',
+    'weight_kg': 'Weight (kg)',
+    'diabetes': 'Diabetes',
+    'diabetes_type': 'Diabetes Type',
+    'latest_hba1c': 'Latest HbA1c',
+    'hypertension': 'Hypertension',
+    'high_cholesterol': 'High Cholesterol',
+    'profile_updated_successfully': 'Profile updated successfully',
+    'profile_load_failed': 'Failed to load profile',
+    'profile_update_failed': 'Failed to update profile',
 
     // Notifications
     'notifications': 'Notifications',
@@ -105,6 +141,8 @@ class LanguageProvider extends ChangeNotifier {
     'dinner': 'Dinner',
     'snack': 'Snack',
     'food_recognition': 'Food Recognition',
+    'meal': 'Meal',
+    'food_details_unavailable': 'Food details unavailable',
 
     // Profile Setup
     'profile_setup': 'Profile Setup',
@@ -122,6 +160,7 @@ class LanguageProvider extends ChangeNotifier {
         'Your recent meals and nutritional data will appear here.',
     'no_meals_logged': 'No meals logged yet',
     'start_tracking': 'Start tracking your meals to see your history here',
+    'history_load_failed': 'Failed to load meal history.',
 
     // Statistics
     'statistics': 'Statistics',
@@ -139,6 +178,13 @@ class LanguageProvider extends ChangeNotifier {
     'no_education_content': 'No education content available',
     'error_loading_article': 'Error loading article',
     'article_not_found': 'Article not found',
+
+    // Leaderboard
+    'leaderboard_load_failed': 'Failed to load leaderboard',
+    'no_leaderboard_data': 'No leaderboard data available',
+    'rankings': 'Rankings',
+    'current': 'Current',
+    'best': 'Best',
   };
 
   // --- Amharic Strings ---
@@ -167,6 +213,14 @@ class LanguageProvider extends ChangeNotifier {
     'full_name': 'ሙሉ ስም',
     'welcome_back': 'እንኳን ደህና መጡ',
     'create_account': 'መለያ ፍጠር',
+    'male': 'ወንድ',
+    'female': 'ሴት',
+    'sedentary': 'ዝቅተኛ እንቅስቃሴ',
+    'lightly_active': 'ትንሽ ንቁ',
+    'moderately_active': 'መጠነኛ ንቁ',
+    'very_active': 'በጣም ንቁ',
+    'type_1': 'ዓይነት 1',
+    'type_2': 'ዓይነት 2',
 
     // Home
     'this_week': 'ይህ ሳምንት',
@@ -177,6 +231,19 @@ class LanguageProvider extends ChangeNotifier {
     'quick_actions': 'ፈጣን ድርጊቶች',
     'text_entry': 'የጽሑፍ ግቤት',
     'capture_food': 'ምግብ ቅረጽ',
+    'dashboard_load_failed': 'የዳሽቦርድ መረጃን መጫን አልተሳካም',
+    'back_to_today': 'ወደ ዛሬ ተመለስ',
+    'meal_breakdown': 'የምግብ ክፍፍል',
+    'protein': 'ፕሮቲን',
+    'carbs': 'ካርቦሃይድሬት',
+    'fat': 'ስብ',
+    'day_mon_short': 'ሰኞ',
+    'day_tue_short': 'ማክ',
+    'day_wed_short': 'ረቡ',
+    'day_thu_short': 'ሐሙ',
+    'day_fri_short': 'ዓር',
+    'day_sat_short': 'ቅዳ',
+    'day_sun_short': 'እሑ',
 
     // Profile
     'edit_profile': 'መገለጫ አርትዕ',
@@ -186,6 +253,21 @@ class LanguageProvider extends ChangeNotifier {
     'select_language': 'ቋንቋ ይምረጡ',
     'english': 'English',
     'amharic': 'አማርኛ',
+    'save_profile': 'መገለጫ አስቀምጥ',
+    'basic_information': 'መሰረታዊ መረጃ',
+    'physical_data': 'አካላዊ መረጃ',
+    'app_settings': 'የመተግበሪያ ቅንብሮች',
+    'language_preference': 'የቋንቋ ምርጫ',
+    'height_cm': 'ቁመት (ሴሜ)',
+    'weight_kg': 'ክብደት (ኪግ)',
+    'diabetes': 'የስኳር በሽታ',
+    'diabetes_type': 'የስኳር በሽታ አይነት',
+    'latest_hba1c': 'የቅርብ HbA1c',
+    'hypertension': 'የደም ግፊት',
+    'high_cholesterol': 'ከፍተኛ ኮሌስትሮል',
+    'profile_updated_successfully': 'መገለጫ በተሳካ ሁኔታ ተዘምኗል',
+    'profile_load_failed': 'መገለጫን መጫን አልተሳካም',
+    'profile_update_failed': 'መገለጫን ማዘመን አልተሳካም',
 
     // Notifications
     'notifications': 'ማሳወቂያዎች',
@@ -206,6 +288,8 @@ class LanguageProvider extends ChangeNotifier {
     'dinner': 'እራት',
     'snack': 'መክሰስ',
     'food_recognition': 'የምግብ ማወቅ',
+    'meal': 'ምግብ',
+    'food_details_unavailable': 'የምግብ ዝርዝር አልተገኘም',
 
     // Profile Setup
     'profile_setup': 'የመገለጫ ማዋቀር',
@@ -222,6 +306,7 @@ class LanguageProvider extends ChangeNotifier {
     'meal_history_desc': 'የቅርብ ጊዜ ምግቦችዎ እና የአመጋገብ መረጃዎ እዚህ ይታያሉ።',
     'no_meals_logged': 'ገና ምንም ምግብ አልተመዘገበም',
     'start_tracking': 'ታሪክዎን ለማየት ምግቦችዎን መመዝገብ ይጀምሩ',
+    'history_load_failed': 'የምግብ ታሪክን መጫን አልተሳካም',
 
     // Statistics
     'statistics': 'ስታቲስቲክስ',
@@ -239,5 +324,12 @@ class LanguageProvider extends ChangeNotifier {
     'no_education_content': 'ምንም የትምህርት ይዘት የለም',
     'error_loading_article': 'ጽሑፍ በመጫን ላይ ስህተት ተከስቷል',
     'article_not_found': 'ጽሑፍ አልተገኘም',
+
+    // Leaderboard
+    'leaderboard_load_failed': 'ሊደርቦርዱን መጫን አልተሳካም',
+    'no_leaderboard_data': 'ምንም የሊደርቦርድ መረጃ የለም',
+    'rankings': 'ደረጃዎች',
+    'current': 'አሁን',
+    'best': 'ምርጥ',
   };
 }

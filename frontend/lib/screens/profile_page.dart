@@ -75,7 +75,9 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showErrorSnackBar('Failed to load profile: $e');
+      _showErrorSnackBar(
+        '${context.read<LanguageProvider>().t('profile_load_failed')}: $e',
+      );
     }
   }
 
@@ -129,9 +131,13 @@ class _ProfilePageState extends State<ProfilePage> {
         _populateFields();
       });
 
-      _showSuccessSnackBar('Profile updated successfully');
+      _showSuccessSnackBar(
+        context.read<LanguageProvider>().t('profile_updated_successfully'),
+      );
     } catch (e) {
-      _showErrorSnackBar('Failed to update profile: $e');
+      _showErrorSnackBar(
+        '${context.read<LanguageProvider>().t('profile_update_failed')}: $e',
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -155,6 +161,33 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColors.primaryGreen,
       ),
     );
+  }
+
+  String _translateProfileOption(LanguageProvider lang, String value) {
+    switch (value) {
+      case 'Male':
+        return lang.t('male');
+      case 'Female':
+        return lang.t('female');
+      case 'Sedentary':
+        return lang.t('sedentary');
+      case 'Lightly Active':
+        return lang.t('lightly_active');
+      case 'Moderately Active':
+        return lang.t('moderately_active');
+      case 'Very Active':
+        return lang.t('very_active');
+      case 'English':
+        return lang.t('english');
+      case 'Amharic':
+        return lang.t('amharic');
+      case 'Type 1':
+        return lang.t('type_1');
+      case 'Type 2':
+        return lang.t('type_2');
+      default:
+        return value;
+    }
   }
 
   @override
@@ -183,7 +216,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      'Profile',
+                                      lang.t('profile'),
                                       style: GoogleFonts.poppins(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w600,
@@ -195,7 +228,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   SizedBox(
                                     width: 120,
                                     child: _buildSaveButton(
-                                      text: 'Save Profile',
+                                      text: lang.t('save_profile'),
                                       onPressed: _saveAllProfile,
                                     ),
                                   ),
@@ -203,27 +236,29 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               const SizedBox(height: 24),
                               _buildSectionCard(
-                                title: 'Basic Information',
+                                title: lang.t('basic_information'),
                                 icon: Icons.person,
                                 child: Column(
                                   children: [
                                     _buildTextField(
                                       controller: _nameController,
-                                      label: 'Full Name',
+                                      label: lang.t('full_name'),
                                       icon: Icons.person_outline,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildTextField(
                                       controller: _emailController,
-                                      label: 'Email',
+                                      label: lang.t('email'),
                                       icon: Icons.email_outlined,
                                       enabled: false,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildDropdownField(
-                                      label: 'Language Preference',
+                                      label: lang.t('language_preference'),
                                       value: _selectedLanguage,
                                       items: _languages,
+                                      itemLabelBuilder: (item) =>
+                                          _translateProfileOption(lang, item),
                                       onChanged: (value) => setState(
                                           () => _selectedLanguage = value),
                                       icon: Icons.language,
@@ -233,21 +268,23 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               const SizedBox(height: 20),
                               _buildSectionCard(
-                                title: 'Physical Data',
+                                title: lang.t('physical_data'),
                                 icon: Icons.fitness_center,
                                 child: Column(
                                   children: [
                                     _buildTextField(
                                       controller: _ageController,
-                                      label: 'Age',
+                                      label: lang.t('age'),
                                       icon: Icons.cake_outlined,
                                       keyboardType: TextInputType.number,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildDropdownField(
-                                      label: 'Gender',
+                                      label: lang.t('gender'),
                                       value: _selectedGender,
                                       items: _genders,
+                                      itemLabelBuilder: (item) =>
+                                          _translateProfileOption(lang, item),
                                       onChanged: (value) => setState(
                                           () => _selectedGender = value),
                                       icon: Icons.person_outline,
@@ -255,22 +292,24 @@ class _ProfilePageState extends State<ProfilePage> {
                                     const SizedBox(height: 16),
                                     _buildTextField(
                                       controller: _heightController,
-                                      label: 'Height (cm)',
+                                      label: lang.t('height_cm'),
                                       icon: Icons.height,
                                       keyboardType: TextInputType.number,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildTextField(
                                       controller: _weightController,
-                                      label: 'Weight (kg)',
+                                      label: lang.t('weight_kg'),
                                       icon: Icons.monitor_weight,
                                       keyboardType: TextInputType.number,
                                     ),
                                     const SizedBox(height: 16),
                                     _buildDropdownField(
-                                      label: 'Activity Level',
+                                      label: lang.t('activity_level'),
                                       value: _selectedActivityLevel,
                                       items: _activityLevels,
+                                      itemLabelBuilder: (item) =>
+                                          _translateProfileOption(lang, item),
                                       onChanged: (value) => setState(
                                           () => _selectedActivityLevel = value),
                                       icon: Icons.directions_run,
@@ -278,7 +317,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     const SizedBox(height: 16),
                                     _buildTextField(
                                       controller: _calorieGoalController,
-                                      label: 'Daily Calorie Goal',
+                                      label: lang.t('daily_calorie_goal'),
                                       icon:
                                           Icons.local_fire_department_outlined,
                                       keyboardType: TextInputType.number,
@@ -288,13 +327,13 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               const SizedBox(height: 20),
                               _buildSectionCard(
-                                title: 'Health Conditions',
+                                title: lang.t('health_conditions'),
                                 icon: Icons.medical_services,
                                 child: Column(
                                   children: [
                                     SwitchListTile(
                                       contentPadding: EdgeInsets.zero,
-                                      title: const Text('Diabetes'),
+                                      title: Text(lang.t('diabetes')),
                                       value: _hasDiabetes,
                                       onChanged: (value) {
                                         setState(() {
@@ -309,9 +348,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                     if (_hasDiabetes) ...[
                                       const SizedBox(height: 8),
                                       _buildDropdownField(
-                                        label: 'Diabetes Type',
+                                        label: lang.t('diabetes_type'),
                                         value: _diabetesType,
                                         items: const ['Type 1', 'Type 2'],
+                                        itemLabelBuilder: (item) =>
+                                            _translateProfileOption(lang, item),
                                         onChanged: (value) => setState(
                                             () => _diabetesType = value),
                                         icon: Icons.monitor_heart_outlined,
@@ -319,7 +360,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       const SizedBox(height: 16),
                                       _buildTextField(
                                         controller: _hba1cController,
-                                        label: 'Latest HbA1c',
+                                        label: lang.t('latest_hba1c'),
                                         icon: Icons.health_and_safety,
                                         keyboardType: const TextInputType
                                             .numberWithOptions(
@@ -330,14 +371,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                     const SizedBox(height: 8),
                                     SwitchListTile(
                                       contentPadding: EdgeInsets.zero,
-                                      title: const Text('Hypertension'),
+                                      title: Text(lang.t('hypertension')),
                                       value: _hasHypertension,
                                       onChanged: (value) => setState(
                                           () => _hasHypertension = value),
                                     ),
                                     SwitchListTile(
                                       contentPadding: EdgeInsets.zero,
-                                      title: const Text('High Cholesterol'),
+                                      title: Text(lang.t('high_cholesterol')),
                                       value: _hasHighCholesterol,
                                       onChanged: (value) => setState(
                                           () => _hasHighCholesterol = value),
@@ -347,7 +388,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               const SizedBox(height: 20),
                               _buildSectionCard(
-                                title: 'App Settings',
+                                title: lang.t('app_settings'),
                                 icon: Icons.settings,
                                 child: Column(
                                   children: [
@@ -393,7 +434,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       icon: Icons.language,
                                       title: lang.t('language'),
                                       trailing: Text(
-                                        lang.isAmharic ? 'አማርኛ' : 'English',
+                                        lang.isAmharic
+                                            ? lang.t('amharic')
+                                            : lang.t('english'),
                                         style: GoogleFonts.poppins(
                                           fontSize: 12,
                                           color: AppColors.textSecondary,
@@ -523,6 +566,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
     required IconData icon,
+    String Function(String item)? itemLabelBuilder,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -538,10 +582,11 @@ class _ProfilePageState extends State<ProfilePage> {
       child: DropdownButtonFormField<String>(
         value: value,
         items: items.map((String item) {
+          final itemLabel = itemLabelBuilder?.call(item) ?? item;
           return DropdownMenuItem<String>(
             value: item,
             child: Text(
-              item,
+              itemLabel,
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: AppColors.textPrimary,
@@ -668,7 +713,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             if (trailing != null) trailing,
             const SizedBox(width: 8),
-            Icon(
+            const Icon(
               Icons.chevron_right,
               color: AppColors.textSecondary,
               size: 20,

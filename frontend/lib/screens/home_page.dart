@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../providers/language_provider.dart';
 import '../services/auth_service.dart';
 import '../services/dashboard_service.dart';
 import '../widgets/app_background.dart';
@@ -41,12 +43,12 @@ class _HomePageState extends State<HomePage> {
   void _generateWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    
+
     // Generate dates for current week + 4 weeks of past dates for scrolling
     weekDates = List.generate(35, (index) {
       return startOfWeek.subtract(Duration(days: 28 - index));
     });
-    
+
     // Scroll to show current week initially
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -81,7 +83,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage = 'Failed to load dashboard data';
+        errorMessage = 'dashboard_load_failed';
       });
     }
   }
@@ -136,12 +138,14 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(),
+              _buildHeader(lang),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -181,7 +185,8 @@ class _HomePageState extends State<HomePage> {
                           decoration: BoxDecoration(
                             color: AppColors.error.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            border: Border.all(
+                                color: AppColors.error.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
@@ -193,7 +198,7 @@ class _HomePageState extends State<HomePage> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  errorMessage!,
+                                  lang.t(errorMessage!),
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     color: AppColors.error,
@@ -223,7 +228,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -237,7 +242,7 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () {
                   Navigator.pushNamed(context, RouteNames.educationList);
                 },
-                tooltip: 'Education & Awareness',
+                tooltip: lang.t('education_awareness'),
               ),
               const SizedBox(width: 8),
               IconButton(

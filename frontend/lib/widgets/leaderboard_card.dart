@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../models/leaderboard_model.dart';
+import '../providers/language_provider.dart';
 import '../widgets/avatar_widget.dart';
 
 class LeaderboardCard extends StatelessWidget {
@@ -18,6 +20,8 @@ class LeaderboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -72,7 +76,7 @@ class LeaderboardCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Current: ${entry.currentStreak} | Best: ${entry.bestStreak}',
+                  '${lang.t('current')}: ${entry.currentStreak} | ${lang.t('best')}: ${entry.bestStreak}',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: AppColors.textSecondary,

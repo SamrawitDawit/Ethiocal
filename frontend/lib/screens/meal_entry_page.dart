@@ -18,11 +18,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
   int _currentStep = 1;
 
   String _selectedMealType = 'breakfast';
-  List<FoodItem> _foodItems = [];
-  List<Ingredient> _ingredients = [];
-  List<SelectedFoodItem> _selectedFoods = [];
+  final List<SelectedFoodItem> _selectedFoods = [];
   bool _isLoading = false;
-  bool _isFetchingData = true;
   String? _createdMealId;
   double _mealBaseCalories = 0.0; // Calories from step 1 (food items)
   Map<String, dynamic>? _mealTargetCheckResult;
@@ -34,42 +31,13 @@ class _MealEntryPageState extends State<MealEntryPage> {
   Map<String, List<FoodItemIngredient>> _standardIngredientsPerFood = {};
 
   // User's ingredient adjustments per food item (food_item_id -> ingredient_id -> selected ingredient)
-  Map<String, Map<String, SelectedIngredientPerFood>> _userAdjustmentsPerFood = {};
-
-  // Dropdown selections
-  FoodItem? _selectedFoodDropdown;
-  Ingredient? _selectedIngredientDropdown;
+  Map<String, Map<String, SelectedIngredientPerFood>> _userAdjustmentsPerFood =
+      {};
 
   // Currently editing food item in step 2
   String? _editingFoodItemId;
 
   final List<String> _mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchData();
-  }
-
-  Future<void> _fetchData() async {
-    try {
-      final foods = await MealService.getFoodItems();
-      final ingredients = await MealService.getIngredients();
-      if (mounted) {
-        setState(() {
-          _foodItems = foods;
-          _ingredients = ingredients;
-          _isFetchingData = false;
-        });
-      }
-      _scheduleMealTargetCheck();
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isFetchingData = false);
-        _showError('Failed to load food data. Please try again.');
-      }
-    }
-  }
 
   void _scheduleMealTargetCheck() {
     if (_selectedFoods.isEmpty) {
@@ -124,11 +92,6 @@ class _MealEntryPageState extends State<MealEntryPage> {
       return Map<String, dynamic>.from(progress);
     }
     return {};
-  }
-
-  String? get _mealDisclaimer {
-    final disclaimer = _mealTargetCheckResult?['disclaimer'];
-    return disclaimer?.toString();
   }
 
   Future<bool> _showMealWarningDialog() async {
@@ -214,7 +177,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
 
   double get _totalSaturatedFatG {
     return _selectedFoods.fold(
-            0.0, (sum, item) => sum + item.totalSaturatedFatG);
+        0.0, (sum, item) => sum + item.totalSaturatedFatG);
   }
 
   double get _totalFiber {
@@ -244,7 +207,6 @@ class _MealEntryPageState extends State<MealEntryPage> {
       } else {
         _selectedFoods.add(SelectedFoodItem(foodItem: item));
       }
-      _selectedFoodDropdown = null;
     });
     _scheduleMealTargetCheck();
   }
@@ -267,7 +229,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
   void _addIngredient(Ingredient item) {
     // When editing a specific food item
     if (_editingFoodItemId != null) {
-      final foodAdjustments = _userAdjustmentsPerFood[_editingFoodItemId!] ?? {};
+      final foodAdjustments =
+          _userAdjustmentsPerFood[_editingFoodItemId!] ?? {};
       final existingKey = foodAdjustments.keys.firstWhere(
         (key) => key == item.id,
         orElse: () => '',
@@ -277,7 +240,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
         foodAdjustments[existingKey]!.quantity += 1;
       } else {
         // Get standard quantity for this ingredient in this food
-        final stdIngredients = _standardIngredientsPerFood[_editingFoodItemId!] ?? [];
+        final stdIngredients =
+            _standardIngredientsPerFood[_editingFoodItemId!] ?? [];
         final stdIng = stdIngredients.firstWhere(
           (si) => si.ingredientId == item.id,
           orElse: () => FoodItemIngredient(
@@ -313,7 +277,41 @@ class _MealEntryPageState extends State<MealEntryPage> {
     }
   }
 
-  Future<void> _createMeal() async {
+  Future<void> _openFoodSearch() async {
+    final food = await showSearch<FoodItem?>(
+      context: context,
+      delegate: _FoodSearchDelegate(),
+    );
+
+    if (!mounted || food == null) {
+      return;
+    }
+
+    _addFood(food);
+  }
+
+  Future<void> _openIngredientSearch() async {
+    final editingFoodItemId = _editingFoodItemId;
+    if (editingFoodItemId == null) {
+      return;
+    }
+
+    final ingredient = await showSearch<Ingredient?>(
+      context: context,
+      delegate: _IngredientSearchDelegate(
+        existingIngredientIds:
+            (_userAdjustmentsPerFood[editingFoodItemId] ?? {}).keys.toSet(),
+      ),
+    );
+
+    if (!mounted || ingredient == null) {
+      return;
+    }
+
+    _addIngredient(ingredient);
+  }
+
+  Future<void> _createMeal({required bool openIngredientEditor}) async {
     if (_selectedFoods.isEmpty) {
       _showError('Please select at least one food item');
       return;
@@ -326,6 +324,15 @@ class _MealEntryPageState extends State<MealEntryPage> {
         mealType: _selectedMealType,
         foodItems: _selectedFoods,
       );
+
+      if (!openIngredientEditor) {
+        setState(() => _isLoading = false);
+        _showSuccess(
+          'Meal saved! ${response.totalCalories.toStringAsFixed(0)} calories logged.',
+        );
+        _finishMealEntry();
+        return;
+      }
 
       _createdMealId = response.id;
       _mealBaseCalories = response.totalCalories;
@@ -362,14 +369,33 @@ class _MealEntryPageState extends State<MealEntryPage> {
     }
   }
 
-  Future<void> _handleCreateMealPressed() async {
+  Future<bool> _confirmMealSubmission() async {
     if (_mealWarnings.isNotEmpty) {
       final proceed = await _showMealWarningDialog();
       if (!proceed) {
-        return;
+        return false;
       }
     }
-    await _createMeal();
+
+    return true;
+  }
+
+  Future<void> _handleSaveMealPressed() async {
+    final proceed = await _confirmMealSubmission();
+    if (!proceed) {
+      return;
+    }
+
+    await _createMeal(openIngredientEditor: false);
+  }
+
+  Future<void> _handleEditIngredientsPressed() async {
+    final proceed = await _confirmMealSubmission();
+    if (!proceed) {
+      return;
+    }
+
+    await _createMeal(openIngredientEditor: true);
   }
 
   Future<void> _fetchStandardIngredientsPerFood() async {
@@ -392,7 +418,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
           );
         }).toList();
 
-        _standardIngredientsPerFood[selectedFood.foodItem.id] = scaledIngredients;
+        _standardIngredientsPerFood[selectedFood.foodItem.id] =
+            scaledIngredients;
       } catch (_) {
         // Silently ignore errors fetching standard ingredients
         _standardIngredientsPerFood[selectedFood.foodItem.id] = [];
@@ -433,7 +460,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
       for (final selectedFood in _selectedFoods) {
         if (selectedFood.mealFoodItemId == null) continue;
 
-        final foodAdjustments = _userAdjustmentsPerFood[selectedFood.foodItem.id];
+        final foodAdjustments =
+            _userAdjustmentsPerFood[selectedFood.foodItem.id];
         if (foodAdjustments != null) {
           for (final ing in foodAdjustments.values) {
             foodItemIngredients.add({
@@ -508,8 +536,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
                         _buildIngredientSelectionPerFood(),
                       ],
                       const SizedBox(height: 20),
-                      if (_selectedFoods.isNotEmpty)
-                        _buildNutritionSummary(),
+                      if (_selectedFoods.isNotEmpty) _buildNutritionSummary(),
                       const SizedBox(height: 16),
                       _buildMealGuidanceCard(),
                       const SizedBox(height: 20),
@@ -536,8 +563,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
                 color: AppColors.textPrimary, size: 20),
             onPressed: () {
               if (_currentStep == 2) {
-                // Go back to step 1
-                setState(() => _currentStep = 1);
+                _finishMealEntry();
               } else {
                 Navigator.pop(context);
               }
@@ -687,10 +713,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
           ),
         ),
         const SizedBox(height: 10),
-        if (_isFetchingData)
-          const Center(child: CircularProgressIndicator())
-        else
-          _buildFoodDropdown(),
+        _buildFoodDropdown(),
         const SizedBox(height: 16),
         if (_selectedFoods.isNotEmpty) ...[
           Text(
@@ -711,71 +734,10 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   Widget _buildFoodDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.inputFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.inputBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<FoodItem>(
-          isExpanded: true,
-          hint: Text(
-            'Choose a food item...',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          value: _selectedFoodDropdown,
-          items: _foodItems.map((food) {
-            return DropdownMenuItem<FoodItem>(
-              value: food,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          food.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (food.nameAmharic != null)
-                          Text(
-                            food.nameAmharic!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${food.caloriesPerServing.toStringAsFixed(0)} cal',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryGreen,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-          onChanged: (food) {
-            if (food != null) {
-              _addFood(food);
-            }
-          },
-        ),
-      ),
+    return _buildSearchTrigger(
+      title: _selectedFoods.isEmpty ? 'Search food items' : 'Add another food',
+      subtitle: 'Type at least 2 letters to search the food database',
+      onTap: _openFoodSearch,
     );
   }
 
@@ -895,9 +857,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryGreen
-                    : AppColors.inputFill,
+                color:
+                    isSelected ? AppColors.primaryGreen : AppColors.inputFill,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
@@ -924,7 +885,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
     final foodAdjustments = _userAdjustmentsPerFood[_editingFoodItemId] ?? {};
     final selectedFood = _selectedFoods.firstWhere(
       (f) => f.foodItem.id == _editingFoodItemId,
-      orElse: () => SelectedFoodItem(foodItem: FoodItem(
+      orElse: () => SelectedFoodItem(
+          foodItem: FoodItem(
         id: '',
         name: '',
         standardServingSize: 100,
@@ -1105,7 +1067,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
           ),
           _buildQuantityControl(
             quantity: adjustment.quantity,
-            onDecrease: () => _removeIngredient(foodItemId, adjustment.ingredient.id),
+            onDecrease: () =>
+                _removeIngredient(foodItemId, adjustment.ingredient.id),
             onIncrease: () {
               setState(() {
                 adjustment.quantity += 1;
@@ -1119,77 +1082,69 @@ class _MealEntryPageState extends State<MealEntryPage> {
   }
 
   Widget _buildIngredientDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.inputFill,
+    return _buildSearchTrigger(
+      title: 'Search extra ingredients',
+      subtitle: 'Add ingredients without loading the full ingredient list',
+      onTap: _openIngredientSearch,
+    );
+  }
+
+  Widget _buildSearchTrigger({
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.inputBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<Ingredient>(
-          isExpanded: true,
-          hint: Text(
-            'Add extra ingredient...',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.inputFill,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.inputBorder),
           ),
-          value: _selectedIngredientDropdown,
-          items: _ingredients.map((ing) {
-            // Filter out ingredients already in adjustments
-            final existing = _userAdjustmentsPerFood[_editingFoodItemId] ?? {};
-            if (existing.containsKey(ing.id)) {
-              return null;
-            }
-            return DropdownMenuItem<Ingredient>(
-              value: ing,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          ing.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (ing.nameAmharic != null)
-                          Text(
-                            ing.nameAmharic!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${ing.caloriesPerServing.toStringAsFixed(0)} cal',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryGreen,
-                    ),
-                  ),
-                ],
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search,
+                color: AppColors.textSecondary,
+                size: 20,
               ),
-            );
-          }).whereType<DropdownMenuItem<Ingredient>>().toList(),
-          onChanged: (ing) {
-            if (ing != null) {
-              _addIngredient(ing);
-              setState(() {
-                _selectedIngredientDropdown = null;
-              });
-            }
-          },
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: AppColors.textSecondary,
+                size: 14,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1262,13 +1217,11 @@ class _MealEntryPageState extends State<MealEntryPage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNutritionItem(
-                  'Calories', '${_totalCalories.toStringAsFixed(0)}', 'kcal'),
+                  'Calories', _totalCalories.toStringAsFixed(0), 'kcal'),
               _buildNutritionItem(
-                  'Protein', '${_totalProtein.toStringAsFixed(1)}', 'g'),
-              _buildNutritionItem(
-                  'Carbs', '${_totalCarbs.toStringAsFixed(1)}', 'g'),
-              _buildNutritionItem(
-                  'Fat', '${_totalFat.toStringAsFixed(1)}', 'g'),
+                  'Protein', _totalProtein.toStringAsFixed(1), 'g'),
+              _buildNutritionItem('Carbs', _totalCarbs.toStringAsFixed(1), 'g'),
+              _buildNutritionItem('Fat', _totalFat.toStringAsFixed(1), 'g'),
             ],
           ),
         ],
@@ -1308,38 +1261,66 @@ class _MealEntryPageState extends State<MealEntryPage> {
 
   Widget _buildActionButtons() {
     if (_currentStep == 1) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _isLoading || _selectedFoods.isEmpty
-              ? null
-              : _handleCreateMealPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryGreen,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 0,
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  'Next: Adjust Ingredients',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isLoading || _selectedFoods.isEmpty
+                  ? null
+                  : _handleSaveMealPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-        ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Save Meal',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _isLoading || _selectedFoods.isEmpty
+                  ? null
+                  : _handleEditIngredientsPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryGreen,
+                side: const BorderSide(color: AppColors.primaryGreen),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Edit Ingredients First',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -1410,7 +1391,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.health_and_safety, color: AppColors.primaryGreen),
+              const Icon(Icons.health_and_safety,
+                  color: AppColors.primaryGreen),
               const SizedBox(width: 8),
               Text(
                 'Meal guidance',
@@ -1493,11 +1475,259 @@ class _MealEntryPageState extends State<MealEntryPage> {
               value: percent,
               minHeight: 6,
               backgroundColor: AppColors.inputBorder,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FoodSearchDelegate extends SearchDelegate<FoodItem?> {
+  _FoodSearchDelegate() : super(searchFieldLabel: 'Search food items');
+
+  String _lastQuery = '';
+  Future<List<FoodItem>>? _lastSearch;
+
+  Future<List<FoodItem>> _searchFoods(String query) {
+    if (_lastSearch != null && _lastQuery == query) {
+      return _lastSearch!;
+    }
+
+    _lastQuery = query;
+    _lastSearch = MealService.getFoodItems(search: query);
+    return _lastSearch!;
+  }
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            query = '';
+          },
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _SearchResultsList<FoodItem>(
+      query: query,
+      minQueryMessage: 'Type at least 2 letters to search foods.',
+      emptyMessage: 'No matching foods found.',
+      errorMessage: 'Failed to search foods. Please try again.',
+      loadResults: _searchFoods,
+      itemBuilder: (context, food) {
+        return ListTile(
+          title: Text(
+            food.name,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: food.nameAmharic == null
+              ? null
+              : Text(
+                  food.nameAmharic!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+          trailing: Text(
+            '${food.caloriesPerServing.toStringAsFixed(0)} cal',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryGreen,
+            ),
+          ),
+          onTap: () => close(context, food),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) => buildResults(context);
+}
+
+class _IngredientSearchDelegate extends SearchDelegate<Ingredient?> {
+  _IngredientSearchDelegate({required this.existingIngredientIds})
+      : super(searchFieldLabel: 'Search extra ingredients');
+
+  final Set<String> existingIngredientIds;
+  String _lastQuery = '';
+  Future<List<Ingredient>>? _lastSearch;
+
+  Future<List<Ingredient>> _searchIngredients(String query) {
+    if (_lastSearch != null && _lastQuery == query) {
+      return _lastSearch!;
+    }
+
+    _lastQuery = query;
+    _lastSearch = MealService.getIngredients(search: query).then(
+      (ingredients) => ingredients
+          .where((ingredient) => !existingIngredientIds.contains(ingredient.id))
+          .toList(),
+    );
+    return _lastSearch!;
+  }
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            query = '';
+          },
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _SearchResultsList<Ingredient>(
+      query: query,
+      minQueryMessage: 'Type at least 2 letters to search ingredients.',
+      emptyMessage: 'No matching ingredients found.',
+      errorMessage: 'Failed to search ingredients. Please try again.',
+      loadResults: _searchIngredients,
+      itemBuilder: (context, ingredient) {
+        return ListTile(
+          title: Text(
+            ingredient.name,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: ingredient.nameAmharic == null
+              ? null
+              : Text(
+                  ingredient.nameAmharic!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+          trailing: Text(
+            '${ingredient.caloriesPerServing.toStringAsFixed(0)} cal',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryGreen,
+            ),
+          ),
+          onTap: () => close(context, ingredient),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) => buildResults(context);
+}
+
+class _SearchResultsList<T> extends StatelessWidget {
+  const _SearchResultsList({
+    required this.query,
+    required this.minQueryMessage,
+    required this.emptyMessage,
+    required this.errorMessage,
+    required this.loadResults,
+    required this.itemBuilder,
+  });
+
+  final String query;
+  final String minQueryMessage;
+  final String emptyMessage;
+  final String errorMessage;
+  final Future<List<T>> Function(String query) loadResults;
+  final Widget Function(BuildContext context, T item) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
+      return Center(
+        child: Text(
+          minQueryMessage,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return FutureBuilder<List<T>>(
+      future: loadResults(trimmedQuery),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.primaryGreen),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              errorMessage,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+
+        final items = snapshot.data ?? <T>[];
+        if (items.isEmpty) {
+          return Center(
+            child: Text(
+              emptyMessage,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+
+        return ListView.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) => itemBuilder(context, items[index]),
+        );
+      },
     );
   }
 }
