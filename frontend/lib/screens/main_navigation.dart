@@ -47,7 +47,7 @@ class _MainNavigationState extends State<MainNavigation> {
         margin: const EdgeInsets.only(top: 20),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-         // border: Border.all(color: Colors.white, width: 4),
+          // border: Border.all(color: Colors.white, width: 4),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -57,9 +57,7 @@ class _MainNavigationState extends State<MainNavigation> {
           ],
         ),
         child: FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, RouteNames.foodRecognition);
-          },
+          onPressed: _showCreateOptionsSheet,
           backgroundColor: AppColors.primaryGreen,
           elevation: 0,
           child: const Icon(
@@ -122,6 +120,109 @@ class _MainNavigationState extends State<MainNavigation> {
               label: lang.t('leaderboard'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateOptionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _CreateOptionCard(
+                    icon: Icons.text_fields,
+                    label: context.read<LanguageProvider>().t('text_entry'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.mealEntry);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _CreateOptionCard(
+                    icon: Icons.camera_alt,
+                    label: context.read<LanguageProvider>().t('capture_food'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.foodRecognition);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateOptionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _CreateOptionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 124,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FBF7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE4E9E0)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppColors.primaryGreen, size: 34),
+              const SizedBox(height: 16),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

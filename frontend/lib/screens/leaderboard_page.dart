@@ -251,6 +251,8 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                 name: entry.fullName,
                 radius: 28,
                 backgroundColor: colors[rank - 1],
+                useFruitAvatar: true,
+                variantSeed: entry.userId,
               ),
             ),
           ],

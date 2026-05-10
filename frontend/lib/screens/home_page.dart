@@ -9,7 +9,6 @@ import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/weekly_calendar.dart';
 import '../widgets/intake_card.dart';
-import '../widgets/quick_actions.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -49,7 +48,6 @@ class _HomePageState extends State<HomePage> {
       return startOfWeek.subtract(Duration(days: 28 - index));
     });
 
-    // Scroll to show current week initially
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         // Calculate position to show current week (days 28-34 in our list)
@@ -214,8 +212,6 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 24),
-                      const QuickActions(),
                       const SizedBox(height: 32),
                     ],
                   ),

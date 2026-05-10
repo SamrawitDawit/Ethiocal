@@ -56,6 +56,8 @@ class LeaderboardCard extends StatelessWidget {
             radius: 20,
             backgroundColor:
                 isCurrentUser ? AppColors.primaryGreen : AppColors.lightGreen,
+            useFruitAvatar: true,
+            variantSeed: entry.userId,
           ),
           const SizedBox(width: 12),
 
