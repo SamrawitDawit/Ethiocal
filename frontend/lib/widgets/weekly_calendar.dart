@@ -100,10 +100,10 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
       backgroundColor = AppColors.primaryGreen;
       borderColor = Colors.transparent;
       textColor = Colors.white;
-    } else if (isToday) {
-      backgroundColor = AppColors.lightGreen;
-      borderColor = Colors.transparent;
-      textColor = Colors.white;
+    } else if (isToday && !isSelected) {
+      backgroundColor = Colors.transparent;
+      borderColor = AppColors.inputBorder;
+      textColor = AppColors.textPrimary;
     } else {
       backgroundColor = Colors.transparent;
       borderColor = isFuture
@@ -115,7 +115,7 @@ class _WeeklyCalendarState extends State<WeeklyCalendar> {
     }
 
     return GestureDetector(
-      onTap: isFuture ? null : () => widget.onDateTapped(date),
+      onTap: () => widget.onDateTapped(date), // Always allow tapping today's date
       child: Container(
         width: 50,
         height: 70,
