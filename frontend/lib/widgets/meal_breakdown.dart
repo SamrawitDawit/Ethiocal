@@ -47,26 +47,30 @@ class MealBreakdown extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.6,
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            int crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+            
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                mainAxisExtent: 110, 
+              ),
           itemCount: mealTypes.length,
-          itemBuilder: (context, index) {
-            final mealType = mealTypes[index];
-            final data =
-                mealBreakdown![mealType['type']] as Map<String, dynamic>? ??
-                    {'calories': 0, 'count': 0};
-            final calories = data['calories'] as int;
-            final count = data['count'] as int;
+              itemBuilder: (context, index) {
+                final mealType = mealTypes[index];
+                final data =
+                    mealBreakdown![mealType['type']] as Map<String, dynamic>? ??
+                        {'calories': 0, 'count': 0};
+                final calories = data['calories'] as int;
+                final count = data['count'] as int;
 
-            return Container(
-              padding: const EdgeInsets.all(16),
+                return Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.cardFill,
                 borderRadius: BorderRadius.circular(12),
@@ -87,24 +91,24 @@ class MealBreakdown extends StatelessWidget {
                         color: calories > 0
                             ? AppColors.primaryGreen
                             : AppColors.textSecondary,
-                        size: 20,
+                        size: 16,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         mealType['label'] as String,
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     '$calories kcal',
                     style: GoogleFonts.poppins(
-                      fontSize: 18,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: calories > 0
                           ? AppColors.primaryGreen
@@ -125,6 +129,8 @@ class MealBreakdown extends StatelessWidget {
                   ],
                 ],
               ),
+            );
+              },
             );
           },
         ),
