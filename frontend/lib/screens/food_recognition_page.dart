@@ -1350,7 +1350,10 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       }
     } catch (e) {
       _showError('Error: ${e.toString()}');
-      setState(() => _isSaving = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

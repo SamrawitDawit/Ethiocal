@@ -36,7 +36,18 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _generateWeekDates();
     selectedDate = today; // Set today as selected by default
-    _fetchDashboardData();
+    fetchDashboardData();
+  }
+
+  @override
+  void didUpdateWidget(HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This will be called when returning from navigation if the widget is updated
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        fetchDashboardData();
+      }
+    });
   }
 
   void _generateWeekDates() {
@@ -63,7 +74,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _fetchDashboardData() async {
+  Future<void> fetchDashboardData() async {
     setState(() {
       isLoading = true;
       errorMessage = null;
@@ -87,7 +98,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refreshDashboard() async {
-    await _fetchDashboardData();
+    await fetchDashboardData();
+  }
+
+  Future<void> _navigateAndRefresh(String routeName) async {
+    final result = await Navigator.pushNamed(context, routeName);
+    // If meal was successfully logged (result == true), refresh dashboard
+    if (result == true) {
+      await fetchDashboardData();
+    }
   }
 
   Future<void> _onDateTapped(DateTime date) async {

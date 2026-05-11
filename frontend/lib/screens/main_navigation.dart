@@ -125,6 +125,17 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
+  Future<void> _navigateAndRefresh(BuildContext context, String routeName) async {
+    final result = await Navigator.pushNamed(context, routeName);
+    // If meal was successfully logged (result == true), trigger refresh
+    if (result == true && mounted) {
+      // More reliable approach: force a complete rebuild of the home page
+      setState(() {
+        _pages[0] = HomePage(key: ValueKey(DateTime.now().millisecondsSinceEpoch));
+      });
+    }
+  }
+
   void _showCreateOptionsSheet() {
     showModalBottomSheet(
       context: context,
@@ -148,28 +159,24 @@ class _MainNavigationState extends State<MainNavigation> {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: _CreateOptionCard(
-                    icon: Icons.text_fields,
-                    label: context.read<LanguageProvider>().t('text_entry'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.mealEntry);
-                    },
-                  ),
+                _CreateOptionCard(
+                  icon: Icons.text_fields,
+                  label: context.read<LanguageProvider>().t('text_entry'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _navigateAndRefresh(context, RouteNames.mealEntry);
+                  },
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _CreateOptionCard(
-                    icon: Icons.camera_alt,
-                    label: context.read<LanguageProvider>().t('capture_food'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.foodRecognition);
-                    },
-                  ),
+                const SizedBox(height: 12),
+                _CreateOptionCard(
+                  icon: Icons.camera_alt,
+                  label: context.read<LanguageProvider>().t('capture_food'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _navigateAndRefresh(context, RouteNames.foodRecognition);
+                  },
                 ),
               ],
             ),
@@ -193,36 +200,25 @@ class _CreateOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          height: 124,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9FBF7),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE4E9E0)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.primaryGreen, size: 34),
-              const SizedBox(height: 16),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 80,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primaryGreen, size: 24),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
