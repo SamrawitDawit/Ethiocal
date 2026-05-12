@@ -5,7 +5,9 @@ import '../constants/app_constants.dart';
 import '../providers/language_provider.dart';
 
 class QuickActions extends StatelessWidget {
-  const QuickActions({super.key});
+  const QuickActions({super.key, required this.onMealLogged});
+
+  final VoidCallback? onMealLogged;
 
   @override
   Widget build(BuildContext context) {

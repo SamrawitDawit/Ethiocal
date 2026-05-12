@@ -86,7 +86,7 @@ class IntakeCard extends StatelessWidget {
               isHistorical: true,
             ),
           const SizedBox(height: 16),
-          if (onBackPressed != null) _buildBackButton(lang),
+          // Back button removed - today's date in calendar is now clickable
         ],
       );
     }
@@ -159,34 +159,6 @@ class IntakeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBackButton(LanguageProvider lang) {
-    return GestureDetector(
-      onTap: onBackPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.primaryGreen.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.primaryGreen),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.arrow_back,
-                color: AppColors.primaryGreen, size: 16),
-            const SizedBox(width: 4),
-            Text(
-              lang.t('back_to_today'),
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: AppColors.primaryGreen,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&

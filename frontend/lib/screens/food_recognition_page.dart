@@ -1372,7 +1372,10 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       }
     } catch (e) {
       _showError('Error: ${e.toString()}');
-      setState(() => _isSaving = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -2057,34 +2060,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                         ),
                       ),
                     ] else ...[
-                      // Camera button (shown when no image)
-                      GestureDetector(
-                        onTap: _isAnalyzing ? null : _showImageSourceOptions,
-                        child: Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isAnalyzing
-                                ? AppColors.primaryGreen.withOpacity(0.5)
-                                : AppColors.primaryGreen,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryGreen.withOpacity(0.4),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            _selectedImage != null || _webImage != null
-                                ? Icons.refresh
-                                : Icons.add,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ),
+                      _buildImageSourceOptionsInline(),
                     ],
                   ],
                 ),
@@ -2092,6 +2068,98 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildImageSourceOptionsInline() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: _isAnalyzing ? null : _pickImageFromCamera,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primaryGreen.withOpacity(0.18),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.camera_alt,
+                      color: AppColors.primaryGreen,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Camera',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              onTap: _isAnalyzing ? null : _pickImageFromGallery,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primaryGreen.withOpacity(0.18),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.photo_library,
+                      color: AppColors.primaryGreen,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Gallery',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
