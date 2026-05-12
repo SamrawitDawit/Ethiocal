@@ -128,7 +128,10 @@ class FoodRecognitionResult {
         'food_item': foodItem != null
             ? {
                 'id': foodItem!.id,
-                'name': foodItem!.name,
+                'name_english': foodItem!.nameEnglish,
+                'name_amharic': foodItem!.nameAmharic,
+                'description_english': foodItem!.descriptionEnglish,
+                'description_amharic': foodItem!.descriptionAmharic,
               }
             : null,
         'portion_grams': portionGrams,
@@ -136,12 +139,34 @@ class FoodRecognitionResult {
         'estimation_method': estimationMethod,
       };
 
+  FoodRecognitionResult copyWith({
+    String? label,
+    double? confidence,
+    BoundingBox? boundingBox,
+    SegmentationMask? mask,
+    FoodItem? foodItem,
+    double? portionGrams,
+    double? estimatedCalories,
+    String? estimationMethod,
+  }) {
+    return FoodRecognitionResult(
+      label: label ?? this.label,
+      confidence: confidence ?? this.confidence,
+      boundingBox: boundingBox ?? this.boundingBox,
+      mask: mask ?? this.mask,
+      foodItem: foodItem ?? this.foodItem,
+      portionGrams: portionGrams ?? this.portionGrams,
+      estimatedCalories: estimatedCalories ?? this.estimatedCalories,
+      estimationMethod: estimationMethod ?? this.estimationMethod,
+    );
+  }
+
   /// Get confidence as percentage string
   String get confidencePercentage =>
       '${(confidence * 100).toStringAsFixed(1)}%';
 
   /// Get display name (use food item name if matched, otherwise label)
-  String get displayName => foodItem?.name ?? label;
+  String get displayName => foodItem?.displayName ?? label;
 
   /// Get Amharic name if available
   String? get displayNameAmharic => foodItem?.nameAmharic;
@@ -197,6 +222,20 @@ class FoodRecognitionResponse {
         'image_width': imageWidth,
         'image_height': imageHeight,
       };
+
+  FoodRecognitionResponse copyWith({
+    List<FoodRecognitionResult>? predictions,
+    String? imageUrl,
+    int? imageWidth,
+    int? imageHeight,
+  }) {
+    return FoodRecognitionResponse(
+      predictions: predictions ?? this.predictions,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageWidth: imageWidth ?? this.imageWidth,
+      imageHeight: imageHeight ?? this.imageHeight,
+    );
+  }
 
   /// Get total estimated calories across all predictions
   double get totalCalories {

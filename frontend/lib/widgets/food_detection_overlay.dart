@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+Rect _computeFittedImageRect(Size imageSize, Size displaySize) {
+  final fittedSizes = applyBoxFit(BoxFit.contain, imageSize, displaySize);
+  final destinationSize = fittedSizes.destination;
+  final dx = (displaySize.width - destinationSize.width) / 2;
+  final dy = (displaySize.height - destinationSize.height) / 2;
+  return Rect.fromLTWH(dx, dy, destinationSize.width, destinationSize.height);
+}
+
 /// Painter for drawing bounding boxes around detected food items
 class BoundingBoxPainter extends CustomPainter {
   final List<BoundingBoxData> boxes;
@@ -14,21 +22,21 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final fittedRect = _computeFittedImageRect(imageSize, displaySize);
+    final scaleX = fittedRect.width / imageSize.width;
+    final scaleY = fittedRect.height / imageSize.height;
+
     for (final box in boxes) {
       final paint = Paint()
         ..color = box.color
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke;
 
-      // Scale coordinates from image size to display size
-      final scaleX = displaySize.width / imageSize.width;
-      final scaleY = displaySize.height / imageSize.height;
-
       final rect = Rect.fromLTRB(
-        box.x1 * scaleX,
-        box.y1 * scaleY,
-        box.x2 * scaleX,
-        box.y2 * scaleY,
+        fittedRect.left + (box.x1 * scaleX),
+        fittedRect.top + (box.y1 * scaleY),
+        fittedRect.left + (box.x2 * scaleX),
+        fittedRect.top + (box.y2 * scaleY),
       );
 
       // Draw rounded rectangle
@@ -119,19 +127,19 @@ class MaskPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final fittedRect = _computeFittedImageRect(imageSize, displaySize);
+    final scaleX = fittedRect.width / imageSize.width;
+    final scaleY = fittedRect.height / imageSize.height;
+
     for (final mask in masks) {
       if (mask.polygon.isEmpty) continue;
-
-      // Scale coordinates from image size to display size
-      final scaleX = displaySize.width / imageSize.width;
-      final scaleY = displaySize.height / imageSize.height;
 
       final path = Path();
       bool isFirst = true;
 
       for (final point in mask.polygon) {
-        final x = point[0] * scaleX;
-        final y = point[1] * scaleY;
+        final x = fittedRect.left + (point[0] * scaleX);
+        final y = fittedRect.top + (point[1] * scaleY);
 
         if (isFirst) {
           path.moveTo(x, y);
@@ -208,7 +216,7 @@ class FoodDetectionOverlay extends StatelessWidget {
                 ),
               ),
             // Draw bounding boxes on top
-            if (boxes.isNotEmpty)
+            if (boxes.isNotEmpty && masks.isEmpty)
               CustomPaint(
                 size: displaySize,
                 painter: BoundingBoxPainter(

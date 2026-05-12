@@ -139,8 +139,10 @@ create policy "Users can manage own health conditions"
 
 create table if not exists public.food_items (
     id                      uuid primary key default gen_random_uuid(),
-    name                    text not null,
+    name_english            text not null,
     name_amharic            text,
+    description_english     text,
+    description_amharic     text,
     description             text,
     category                text,
     standard_serving_size   float default 100.0,
@@ -418,22 +420,36 @@ create policy "Public read access for food images"
 -- 12. Sample Ethiopian food data (seed)
 -- =============================================
 
-insert into public.food_items (name, name_amharic, category, calories_per_100g, protein, carbohydrates, fat, fiber, standard_serving_size, ai_label, source) values
-    ('Doro Wot', 'ዶሮ ወጥ', 'wot', 350, 28.0, 15.0, 18.0, 3.0, 250.0, 'doro_wot', 'manual'),
-    ('Injera', 'እንጀራ', 'bread', 125, 4.0, 24.0, 1.0, 2.5, 100.0, 'injera', 'manual'),
-    ('Shiro Wot', 'ሽሮ ወጥ', 'wot', 280, 16.0, 32.0, 8.0, 8.0, 200.0, 'shiro_wot', 'manual'),
-    ('Kitfo', 'ክትፎ', 'meat', 400, 22.0, 2.0, 34.0, 0.5, 150.0, 'kitfo', 'manual'),
-    ('Tibs', 'ጥብስ', 'meat', 320, 30.0, 5.0, 20.0, 1.0, 200.0, 'tibs', 'manual'),
-    ('Misir Wot', 'ምስር ወጥ', 'wot', 230, 14.0, 30.0, 5.0, 9.0, 200.0, 'misir_wot', 'manual'),
-    ('Gomen', 'ጎመን', 'vegetable', 90, 4.0, 10.0, 4.0, 5.0, 150.0, 'gomen', 'manual'),
-    ('Ayib', 'አይብ', 'dairy', 120, 8.0, 3.0, 9.0, 0.0, 100.0, 'ayib', 'manual'),
-    ('Firfir', 'ፍርፍር', 'bread', 200, 6.0, 28.0, 7.0, 3.0, 150.0, 'firfir', 'manual'),
-    ('Chechebsa', 'ጨጨብሳ', 'bread', 350, 6.0, 40.0, 18.0, 2.0, 180.0, 'chechebsa', 'manual'),
-    ('Yebeg Tibs', 'የበግ ጥብስ', 'meat', 380, 26.0, 4.0, 28.0, 1.0, 200.0, 'yebeg_tibs', 'manual'),
-    ('Key Wot', 'ቀይ ወጥ', 'wot', 310, 24.0, 12.0, 18.0, 2.0, 200.0, 'key_wot', 'manual'),
-    ('Alicha Wot', 'አልጫ ወጥ', 'wot', 180, 12.0, 18.0, 6.0, 4.0, 200.0, 'alicha_wot', 'manual'),
-    ('Ful', 'ፉል', 'legume', 220, 13.0, 28.0, 6.0, 8.0, 200.0, 'ful', 'manual'),
-    ('Genfo', 'ገንፎ', 'porridge', 280, 8.0, 48.0, 6.0, 3.0, 200.0, 'genfo', 'manual')
+insert into public.food_items (
+    name_english,
+    name_amharic,
+    description_english,
+    description_amharic,
+    category,
+    calories_per_100g,
+    protein,
+    carbohydrates,
+    fat,
+    fiber,
+    standard_serving_size,
+    ai_label,
+    source
+) values
+    ('Doro Wot', 'ዶሮ ወጥ', 'Chicken stew with berbere, butter, egg, and onion.', 'የዶሮ ወጥ በበርበሬ፣ ቅቤ፣ እንቁላል እና ሽንኩርት የተዘጋጀ።', 'wot', 350, 28.0, 15.0, 18.0, 3.0, 250.0, 'doro_wot', 'manual'),
+    ('Injera', 'እንጀራ', 'Fermented Ethiopian flatbread.', 'የተቦካ የኢትዮጵያ ጣፋጭ እንጀራ።', 'bread', 125, 4.0, 24.0, 1.0, 2.5, 100.0, 'injera', 'manual'),
+    ('Shiro Wot', 'ሽሮ ወጥ', 'Spiced chickpea stew.', 'በቅመም የተዘጋጀ የሽምብራ ወጥ።', 'wot', 280, 16.0, 32.0, 8.0, 8.0, 200.0, 'shiro_wot', 'manual'),
+    ('Kitfo', 'ክትፎ', 'Seasoned minced beef dish.', 'በቅመም የተዘጋጀ የተፈጨ ስጋ ምግብ።', 'meat', 400, 22.0, 2.0, 34.0, 0.5, 150.0, 'kitfo', 'manual'),
+    ('Tibs', 'ጥብስ', 'Pan-fried meat with spices.', 'በቅመም የተጠበሰ ስጋ።', 'meat', 320, 30.0, 5.0, 20.0, 1.0, 200.0, 'tibs', 'manual'),
+    ('Misir Wot', 'ምስር ወጥ', 'Spiced lentil stew.', 'በቅመም የተዘጋጀ የምስር ወጥ።', 'wot', 230, 14.0, 30.0, 5.0, 9.0, 200.0, 'misir_wot', 'manual'),
+    ('Gomen', 'ጎመን', 'Cooked leafy greens.', 'የተቀቀለ ቅጠላማ አትክልት።', 'vegetable', 90, 4.0, 10.0, 4.0, 5.0, 150.0, 'gomen', 'manual'),
+    ('Ayib', 'አይብ', 'Traditional Ethiopian cottage cheese.', 'ባህላዊ የኢትዮጵያ አይብ።', 'dairy', 120, 8.0, 3.0, 9.0, 0.0, 100.0, 'ayib', 'manual'),
+    ('Firfir', 'ፍርፍር', 'Shredded injera mixed with sauce.', 'ከወጥ ጋር የተቀላቀለ የተቆራረጠ እንጀራ።', 'bread', 200, 6.0, 28.0, 7.0, 3.0, 150.0, 'firfir', 'manual'),
+    ('Chechebsa', 'ጨጨብሳ', 'Torn flatbread mixed with butter and berbere.', 'ከቅቤ እና በርበሬ ጋር የተቀላቀለ የተቆራረጠ ቂጣ።', 'bread', 350, 6.0, 40.0, 18.0, 2.0, 180.0, 'chechebsa', 'manual'),
+    ('Yebeg Tibs', 'የበግ ጥብስ', 'Pan-fried lamb with spices.', 'በቅመም የተጠበሰ የበግ ስጋ።', 'meat', 380, 26.0, 4.0, 28.0, 1.0, 200.0, 'yebeg_tibs', 'manual'),
+    ('Key Wot', 'ቀይ ወጥ', 'Hot red stew with berbere spices.', 'በበርበሬ የተቀመመ ቀይ ወጥ።', 'wot', 310, 24.0, 12.0, 18.0, 2.0, 200.0, 'key_wot', 'manual'),
+    ('Alicha Wot', 'አልጫ ወጥ', 'Mild turmeric-based stew.', 'በእርድ የተቀመመ አልጫ ወጥ።', 'wot', 180, 12.0, 18.0, 6.0, 4.0, 200.0, 'alicha_wot', 'manual'),
+    ('Ful', 'ፉል', 'Cooked fava bean dish.', 'የተቀቀለ የባቄላ ምግብ።', 'legume', 220, 13.0, 28.0, 6.0, 8.0, 200.0, 'ful', 'manual'),
+    ('Genfo', 'ገንፎ', 'Thick porridge often served warm.', 'ብዙ ጊዜ ትኩስ የሚቀርብ ወፍራም ገንፎ።', 'porridge', 280, 8.0, 48.0, 6.0, 3.0, 200.0, 'genfo', 'manual')
 on conflict (ai_label) do nothing;
 
 

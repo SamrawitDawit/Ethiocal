@@ -14,9 +14,11 @@ from pydantic import BaseModel
 
 class FoodItemCreate(BaseModel):
     """Create a new food item (admin only)."""
-    name: str
+    name_english: str
     name_amharic: str | None = None
     description: str | None = None
+    description_english: str | None = None
+    description_amharic: str | None = None
     category: str | None = None
     standard_serving_size: float = 100.0
     calories_per_100g: float
@@ -34,9 +36,11 @@ class FoodItemCreate(BaseModel):
 
 class FoodItemUpdate(BaseModel):
     """Update food item (admin only)."""
-    name: str | None = None
+    name_english: str | None = None
     name_amharic: str | None = None
     description: str | None = None
+    description_english: str | None = None
+    description_amharic: str | None = None
     category: str | None = None
     standard_serving_size: float | None = None
     calories_per_100g: float | None = None
@@ -51,9 +55,11 @@ class FoodItemUpdate(BaseModel):
 class FoodItemResponse(BaseModel):
     """Full nutritional info for one food item."""
     id: str
-    name: str
+    name_english: str
     name_amharic: str | None = None
     description: str | None = None
+    description_english: str | None = None
+    description_amharic: str | None = None
     category: str | None = None
     standard_serving_size: float
     calories_per_100g: float

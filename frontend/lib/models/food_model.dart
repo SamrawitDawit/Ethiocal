@@ -1,8 +1,10 @@
 class FoodItem {
   final String id;
-  final String name;
+  final String nameEnglish;
   final String? nameAmharic;
   final String? description;
+  final String? descriptionEnglish;
+  final String? descriptionAmharic;
   final String? category;
   final double standardServingSize;
   final double caloriesPerServing;
@@ -20,9 +22,11 @@ class FoodItem {
 
   FoodItem({
     required this.id,
-    required this.name,
+    required this.nameEnglish,
     this.nameAmharic,
     this.description,
+    this.descriptionEnglish,
+    this.descriptionAmharic,
     this.category,
     required this.standardServingSize,
     required this.caloriesPerServing,
@@ -40,11 +44,20 @@ class FoodItem {
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
+    final nameEnglish = ((json['name_english'] ?? json['name']) as String?)
+      ?.trim();
+    final descriptionEnglish =
+      (json['description_english'] as String?)?.trim();
+    final descriptionAmharic =
+      (json['description_amharic'] as String?)?.trim();
+
     return FoodItem(
       id: json['id'],
-      name: json['name'],
+      nameEnglish: nameEnglish ?? '',
       nameAmharic: json['name_amharic'],
-      description: json['description'],
+      description: json['description'] as String?,
+      descriptionEnglish: descriptionEnglish,
+      descriptionAmharic: descriptionAmharic,
       category: json['category'],
       standardServingSize:
           (json['standard_serving_size'] as num?)?.toDouble() ?? 100.0,
@@ -62,6 +75,33 @@ class FoodItem {
       aiLabel: json['ai_label'],
       createdAt: json['created_at'] ?? '',
     );
+  }
+
+  String get displayName => nameEnglish;
+
+  String localizedTitle(bool isAmharic) {
+    final amharicTitle = nameAmharic?.trim();
+    if (isAmharic && amharicTitle != null && amharicTitle.isNotEmpty) {
+      return amharicTitle;
+    }
+
+    return nameEnglish;
+  }
+
+  String? localizedDescription(bool isAmharic) {
+    final amharicDescription = descriptionAmharic?.trim();
+    if (isAmharic &&
+        amharicDescription != null &&
+        amharicDescription.isNotEmpty) {
+      return amharicDescription;
+    }
+
+    final englishDescription = descriptionEnglish?.trim();
+    if (englishDescription != null && englishDescription.isNotEmpty) {
+      return englishDescription;
+    }
+
+    return null;
   }
 }
 

@@ -9,6 +9,7 @@
 # GET  /{id}                 — get one food item by ID (must be last!)
 # ============================================
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
@@ -31,6 +32,103 @@ from app.services.portion_estimation import estimate_portion_and_calories
 router = APIRouter()
 
 VALID_MEAL_TYPES = {"breakfast", "lunch", "dinner", "snack"}
+DESCRIPTOR_COMMA_PARTS = {
+    "black",
+    "boiled",
+    "brown",
+    "dried",
+    "drained",
+    "dry",
+    "flour",
+    "fresh",
+    "hulled",
+    "pearled",
+    "peeled",
+    "polished",
+    "raw",
+    "red",
+    "refined",
+    "salted",
+    "split",
+    "sweet",
+    "unenriched",
+    "unfermented",
+    "white",
+    "whole",
+    "whole grain",
+    "yellow",
+}
+
+
+def _format_ai_label(label: str | None) -> str | None:
+    if not label:
+        return None
+
+    parts = [part for part in label.split("_") if part]
+    if not parts:
+        return None
+
+    return " ".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def _clean_food_text(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    cleaned = re.sub(r"\s+", " ", value).strip(" ,;")
+    return cleaned or None
+
+
+def _split_food_text(full_name: str | None) -> tuple[str | None, str | None]:
+    cleaned = _clean_food_text(full_name)
+    if not cleaned:
+        return None, None
+
+    lowered = cleaned.casefold()
+    with_index = lowered.find(" with ")
+    if with_index > 0:
+        return _clean_food_text(cleaned[:with_index]), _clean_food_text(cleaned[with_index:])
+
+    comma_parts = [_clean_food_text(part) for part in cleaned.split(",")]
+    comma_parts = [part for part in comma_parts if part]
+    if len(comma_parts) >= 3:
+        title_parts = [comma_parts[0]]
+        if comma_parts[1].casefold() not in DESCRIPTOR_COMMA_PARTS:
+            title_parts.append(comma_parts[1])
+
+        title = ", ".join(title_parts)
+        remainder = ", ".join(comma_parts[len(title_parts):])
+        return _clean_food_text(title), _clean_food_text(remainder)
+
+    word_parts = cleaned.split()
+    if len(word_parts) > 4:
+        title = " ".join(word_parts[:4])
+        remainder = " ".join(word_parts[4:])
+        return _clean_food_text(title), _clean_food_text(remainder)
+
+    return cleaned, None
+
+
+def _normalize_food_item_row(row: dict) -> dict:
+    normalized = dict(row)
+
+    full_english = row.get("description_english") or row.get("name")
+    inferred_name_english, inferred_description_english = _split_food_text(full_english)
+
+    name_english = _clean_food_text(row.get("name_english")) or inferred_name_english
+    if not name_english:
+        ai_label = row.get("ai_label")
+        if ai_label and not ai_label.startswith("efct_"):
+            name_english = _format_ai_label(ai_label)
+
+    normalized["name_english"] = name_english or ""
+    normalized["description_english"] = (
+        _clean_food_text(row.get("description_english"))
+        or inferred_description_english
+    )
+    normalized["description_amharic"] = _clean_food_text(row.get("description_amharic"))
+
+    return normalized
 
 
 @router.post("/recognize", response_model=FoodRecognitionResponse)
@@ -109,7 +207,8 @@ async def recognize_food(
                 .execute()
             )
             if result and result.data:
-                food_item = FoodItemResponse(**result.data)
+                normalized_food_item = _normalize_food_item_row(result.data)
+                food_item = FoodItemResponse(**normalized_food_item)
                 calories_per_100g = result.data.get("calories_per_100g")
                 standard_serving_size = result.data.get("standard_serving_size")
         except Exception:
@@ -203,18 +302,27 @@ async def recognize_food(
 
 @router.get("/", response_model=list[FoodItemResponse])
 async def list_food_items(
-    search: str | None = Query(None, description="Filter food items by name"),
+    search: str | None = Query(None, description="Filter food items by title or description"),
     current_user: dict = Depends(get_current_user),
 ):
     """List all food items, optionally filtered by name search."""
     supabase = get_supabase_admin()
-    query = supabase.table("food_items").select("*").order("name")
+    result = supabase.table("food_items").select("*").execute()
 
+    items = [_normalize_food_item_row(row) for row in (result.data or [])]
     if search:
-        query = query.ilike("name", f"%{search}%")
+        search_term = search.strip().casefold()
+        items = [
+            item
+            for item in items
+            if search_term in (item.get("name_english") or "").casefold()
+            or search_term in (item.get("name_amharic") or "").casefold()
+            or search_term in (item.get("description_english") or "").casefold()
+            or search_term in (item.get("description_amharic") or "").casefold()
+        ]
 
-    result = query.execute()
-    return result.data
+    items.sort(key=lambda item: (item.get("name_english") or "").casefold())
+    return items
 
 
 @router.get("/ingredients", response_model=list[IngredientResponse])
@@ -315,4 +423,4 @@ async def get_food_item(
             detail="Food item not found.",
         )
 
-    return result.data
+    return _normalize_food_item_row(result.data)

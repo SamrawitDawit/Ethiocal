@@ -75,7 +75,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildMealCard(Meal meal, LanguageProvider lang) {
     final foods = meal.foodItems
-        .map((item) => item.foodItem?.name)
+        .map((item) => item.foodItem?.localizedTitle(lang.isAmharic))
         .whereType<String>()
         .toList();
 

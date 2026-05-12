@@ -757,7 +757,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.foodItem.name,
+                  item.foodItem.displayName,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -871,11 +871,11 @@ class _MealEntryPageState extends State<MealEntryPage> {
                 ),
               ),
               child: Tooltip(
-                message: food.foodItem.name,
+                message: food.foodItem.displayName,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxChipWidth),
                   child: Text(
-                    food.foodItem.name,
+                    food.foodItem.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
@@ -902,7 +902,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
       orElse: () => SelectedFoodItem(
           foodItem: FoodItem(
         id: '',
-        name: '',
+        nameEnglish: '',
         standardServingSize: 100,
         caloriesPerServing: 0,
         carbohydrates: 0,
@@ -926,9 +926,9 @@ class _MealEntryPageState extends State<MealEntryPage> {
           children: [
             Expanded(
               child: Tooltip(
-                message: 'Ingredients for ${selectedFood.foodItem.name}',
+                message: 'Ingredients for ${selectedFood.foodItem.displayName}',
                 child: Text(
-                  'Ingredients for ${selectedFood.foodItem.name}',
+                  'Ingredients for ${selectedFood.foodItem.displayName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
@@ -1554,7 +1554,7 @@ class _FoodSearchDelegate extends SearchDelegate<FoodItem?> {
       itemBuilder: (context, food) {
         return ListTile(
           title: Text(
-            food.name,
+            food.displayName,
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w500,

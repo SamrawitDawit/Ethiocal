@@ -41,8 +41,11 @@ def normalize_label(label: str) -> str:
     return label.lower().strip().replace(" ", "_").replace("-", "_")
 
 
-def get_portion_size(label: str) -> float:
-    """Get the standard portion size in grams for a food label."""
+def get_portion_size(label: str, standard_serving_size: float | None = None) -> float:
+    """Get the portion size in grams for a detected food label."""
+    if standard_serving_size is not None and standard_serving_size > 0:
+        return float(standard_serving_size)
+
     normalized = normalize_label(label)
     return PORTION_SIZES.get(normalized, PORTION_SIZES["default"])
 
@@ -80,13 +83,16 @@ def estimate_portion_and_calories(
         image_width: Width of the image in pixels (unused, for compatibility)
         image_height: Height of the image in pixels (unused, for compatibility)
         calories_per_100g: Calories per 100g (from DB)
-        standard_serving_size: Standard serving size (unused, for compatibility)
+        standard_serving_size: Standard serving size from the matched DB row
 
     Returns:
         Dict with portion_grams, estimated_calories, and estimation_method
     """
     # Get standard portion size for the food label
-    portion_grams = get_portion_size(label)
+    portion_grams = get_portion_size(
+        label,
+        standard_serving_size=standard_serving_size,
+    )
 
     # Calculate calories if we have nutritional data
     estimated_calories = None
