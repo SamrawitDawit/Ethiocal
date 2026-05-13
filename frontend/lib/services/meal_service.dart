@@ -44,13 +44,15 @@ class MealService {
     double portionSize = 1.0,
     String? imageUrl,
   }) async {
+    final isImageBased = imageUrl != null;
     final body = {
       'meal_type': mealType,
       'portion_size': portionSize,
       'food_items': foodItems
           .map((e) => {
                 'food_item_id': e.foodItem.id,
-                'quantity': e.quantity,
+                'quantity':
+                    isImageBased ? e.quantityInGrams : e.servingEquivalent,
               })
           .toList(),
     };
@@ -94,7 +96,7 @@ class MealService {
   /// Add ingredients per food item to an existing meal.
   /// Each ingredient is associated with a specific food item (meal_food_item_id).
   /// This allows ingredient adjustments to be tracked per food item.
-  /// 
+  ///
   /// foodItemIngredients format:
   /// [
   ///   {'meal_food_item_id': '...', 'ingredient_id': '...', 'quantity': 1.0},

@@ -24,6 +24,11 @@ from app.schemas.user import (
     HealthConditionCreate,
     UserHealthConditionAdd,
 )
+from app.services.user_health_conditions import (
+    get_user_profile_with_health,
+    save_user_health_conditions,
+    split_profile_and_health_updates,
+)
 
 router = APIRouter()
 
@@ -46,20 +51,8 @@ async def setup_profile(
     supabase = get_supabase_admin()
     user_id = current_user["id"]
 
-    # Update the profiles table with extended profile data
-    profile_data = {
-        "age": payload.age,
-        "gender": payload.gender,
-        "height": payload.height,
-        "weight": payload.weight,
-        "activity_level": payload.activity_level,
-        "daily_calorie_goal": payload.daily_calorie_goal,
-        "has_diabetes": payload.has_diabetes,
-        "has_hypertension": payload.has_hypertension,
-        "has_high_cholesterol": payload.has_high_cholesterol,
-        "diabetes_type": payload.diabetes_type,
-        "latest_hba1c": payload.latest_hba1c,
-    }
+    profile_payload = payload.model_dump(exclude={"health_condition_ids"})
+    profile_data, health_updates = split_profile_and_health_updates(profile_payload)
 
     result = (
         supabase.table("profiles")
@@ -74,19 +67,25 @@ async def setup_profile(
             detail="Profile update failed.",
         )
 
-    # Handle health conditions
-    if payload.health_condition_ids:
-        # Remove existing health conditions
-        supabase.table("user_health_conditions").delete().eq("user_id", user_id).execute()
+    save_user_health_conditions(
+        supabase,
+        user_id,
+        health_updates=health_updates,
+        health_condition_ids=payload.health_condition_ids,
+    )
 
-        # Add new health conditions
-        for condition_id in payload.health_condition_ids:
-            supabase.table("user_health_conditions").insert({
-                "user_id": user_id,
-                "health_condition_id": condition_id,
-            }).execute()
+    profile = get_user_profile_with_health(
+        supabase,
+        user_id,
+        include_health_conditions=False,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found.",
+        )
 
-    return result.data[0]
+    return profile
 
 
 @router.patch("/me", response_model=UserBasicResponse)
@@ -96,8 +95,9 @@ async def update_profile(
 ):
     """Update the authenticated user's basic profile fields."""
     update_data = payload.model_dump(exclude_unset=True)
+    profile_data, _health_updates = split_profile_and_health_updates(update_data)
 
-    if not update_data:
+    if not profile_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No fields to update.",
@@ -106,7 +106,7 @@ async def update_profile(
     supabase = get_supabase_admin()
     result = (
         supabase.table("profiles")
-        .update(update_data)
+        .update(profile_data)
         .eq("id", current_user["id"])
         .execute()
     )
@@ -117,7 +117,18 @@ async def update_profile(
             detail="Profile update failed.",
         )
 
-    return result.data[0]
+    profile = get_user_profile_with_health(
+        supabase,
+        current_user["id"],
+        include_health_conditions=False,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found.",
+        )
+
+    return profile
 
 
 @router.patch("/profile", response_model=UserBasicResponse)
@@ -127,28 +138,49 @@ async def update_profile_data(
 ):
     """Update the user's extended profile data (age, weight, etc.)."""
     update_data = payload.model_dump(exclude_unset=True)
+    profile_data, health_updates = split_profile_and_health_updates(update_data)
 
-    if not update_data:
+    if not profile_data and not health_updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No fields to update.",
         )
 
     supabase = get_supabase_admin()
-    result = (
-        supabase.table("profiles")
-        .update(update_data)
-        .eq("id", current_user["id"])
-        .execute()
-    )
-
-    if not result.data:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Profile update failed.",
+    if profile_data:
+        result = (
+            supabase.table("profiles")
+            .update(profile_data)
+            .eq("id", current_user["id"])
+            .execute()
         )
 
-    return result.data[0]
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Profile update failed.",
+            )
+
+    if health_updates:
+        save_user_health_conditions(
+            supabase,
+            current_user["id"],
+            health_updates=health_updates,
+            health_condition_ids=None,
+        )
+
+    profile = get_user_profile_with_health(
+        supabase,
+        current_user["id"],
+        include_health_conditions=False,
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found.",
+        )
+
+    return profile
 
 
 @router.get("/health-conditions", response_model=list[HealthConditionResponse])

@@ -15,6 +15,8 @@ class NotificationSettingsPage extends StatefulWidget {
 }
 
 class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+  static const List<String> _defaultReminderTimes = ['08:00', '12:30', '18:30'];
+
   @override
   void initState() {
     super.initState();
@@ -22,6 +24,146 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       context.read<NotificationProvider>().loadPreferences();
       context.read<NotificationProvider>().loadNotifications();
     });
+  }
+
+  TimeOfDay _parseReminderTime(String value) {
+    final parts = value.split(':');
+    if (parts.length != 2) {
+      return const TimeOfDay(hour: 8, minute: 0);
+    }
+
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 8,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  String _formatReminderTime(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<void> _editReminderTimes(
+    NotificationProvider provider,
+    LanguageProvider lang,
+  ) async {
+    final currentTimes = List<String>.from(
+      provider.preferences?.reminderTimes ?? _defaultReminderTimes,
+    );
+    while (currentTimes.length < 3) {
+      currentTimes.add(_defaultReminderTimes[currentTimes.length]);
+    }
+
+    final labels = [lang.t('breakfast'), lang.t('lunch'), lang.t('dinner')];
+    final updatedTimes = List<String>.from(currentTimes.take(3));
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickTime(int index) async {
+              final selected = await showTimePicker(
+                context: context,
+                initialTime: _parseReminderTime(updatedTimes[index]),
+              );
+              if (selected == null) return;
+
+              setModalState(() {
+                updatedTimes[index] = _formatReminderTime(selected);
+              });
+            }
+
+            return Container(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    lang.t('reminder_times'),
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...List.generate(3, (index) {
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        labels[index],
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      subtitle: Text(
+                        updatedTimes[index],
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.schedule,
+                        color: AppColors.primaryGreen,
+                      ),
+                      onTap: () => pickTime(index),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(bottomSheetContext),
+                        child: Text(lang.t('cancel')),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final navigator = Navigator.of(bottomSheetContext);
+                          await provider.updatePreferences(
+                            reminderTimes: updatedTimes,
+                          );
+                          if (!mounted) return;
+                          navigator.pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(lang.t('save')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -154,6 +296,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   fontSize: 12, color: AppColors.textSecondary),
             ),
             trailing: const Icon(Icons.schedule, color: AppColors.primaryGreen),
+            onTap: () => _editReminderTimes(provider, lang),
           ),
         ],
       ),
@@ -204,7 +347,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             child: Column(
               children: [
-                Icon(Icons.notifications_off_outlined,
+                const Icon(Icons.notifications_off_outlined,
                     size: 48, color: AppColors.textSecondary),
                 const SizedBox(height: 12),
                 Text(

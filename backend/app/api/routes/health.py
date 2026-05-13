@@ -20,6 +20,10 @@ from app.services.nutrition_targets import (
     _get_condition_based_nutrient_targets,
     calculate_current_daily_totals,
 )
+from app.services.user_health_conditions import (
+    derive_health_profile,
+    get_user_health_conditions,
+)
 
 router = APIRouter()
 
@@ -49,7 +53,7 @@ async def check_meal_against_health_targets(
 
     profile_result = (
         supabase.table("profiles")
-        .select("daily_calorie_goal, has_diabetes, has_hypertension, has_high_cholesterol, diabetes_type, latest_hba1c")
+        .select("daily_calorie_goal")
         .eq("id", user_id)
         .limit(1)
         .execute()
@@ -57,6 +61,7 @@ async def check_meal_against_health_targets(
 
     profile_rows = profile_result.data or []
     profile = profile_rows[0] if profile_rows else {}
+    profile.update(derive_health_profile(get_user_health_conditions(supabase, user_id)))
     calorie_goal = float(profile.get("daily_calorie_goal") or 2000.0)
     current_daily_totals = await calculate_current_daily_totals(supabase, user_id, date.today())
     meal_nutrients = payload.meal_nutrients.model_dump()

@@ -143,6 +143,71 @@ class LanguageProvider extends ChangeNotifier {
     'food_recognition': 'Food Recognition',
     'meal': 'Meal',
     'food_details_unavailable': 'Food details unavailable',
+    'review_meal_guidance': 'Review meal guidance',
+    'edit_portion': 'Edit portion',
+    'suggest_alternatives': 'Suggest alternatives',
+    'add_anyway': 'Add anyway',
+    'suggested_alternatives': 'Suggested alternatives',
+    'alternative_lower_salt':
+      'Lower-salt: choose less injera with stews that are heavily salted.',
+    'alternative_lower_carb':
+      'Lower-carb: favor vegetables, legumes, and smaller grain portions.',
+    'alternative_higher_fiber':
+      'Higher-fiber: add greens, cabbage, kale, or beans where possible.',
+    'meal_type_label': 'Meal Type',
+    'analyzing_food': 'Analyzing your food...',
+    'add_missing_foods_or_ingredients': 'Add Missing Foods or Ingredients',
+    'search_missing_food': 'Search for a missing food',
+    'search_missing_food_desc':
+      'Find the dish instead of loading the full food list.',
+    'search_extra_ingredient': 'Search for an extra ingredient',
+    'search_extra_ingredient_desc':
+      'Add only what is missing instead of scrolling a dropdown.',
+    'add_food_image': 'Add Food Image',
+    'camera': 'Camera',
+    'gallery': 'Gallery',
+    'no_analysis_result_to_save': 'No analysis result to save',
+    'no_foods_found_to_save':
+      'No foods found. Please add foods using the search controls below the results.',
+    'meal_saved': 'Meal saved!',
+    'calories_logged': 'calories logged.',
+    'no_food_items_detected':
+      'No food items detected. Try taking another photo.',
+    'total_estimated_calories': 'Total Estimated Calories',
+    'detected_foods': 'Detected Foods',
+    'detected_item': 'detected item',
+    'detected_items': 'detected items',
+    'not_in_database_choose_correct_food':
+      'Not in database - choose the correct food',
+    'change_detected_food': 'Change detected food',
+    'select_correct_food': 'Select the correct food',
+    'meal_guidance': 'Meal guidance',
+    'sodium': 'Sodium',
+    'saturated_fat': 'Saturated fat',
+    'todays_sodium': "Today's sodium",
+    'used': 'used',
+    'add_a_food_image': 'Add a food image',
+    'analysis_complete': 'Analysis Complete',
+    'save_to_history': 'Save to History',
+    'total': 'Total',
+    'search_food_items': 'Search food items',
+    'search_foods_min_query': 'Type at least 2 letters to search foods.',
+    'no_matching_foods_found': 'No matching foods found.',
+    'search_foods_failed': 'Failed to search foods. Please try again.',
+    'search_extra_ingredients': 'Search extra ingredients',
+    'search_ingredients_min_query':
+      'Type at least 2 letters to search ingredients.',
+    'no_matching_ingredients_found': 'No matching ingredients found.',
+    'search_ingredients_failed':
+      'Failed to search ingredients. Please try again.',
+    'nutrition_disclaimer':
+      'These are general dietary targets based on 2026 ADA/AHA/Ethiopian NCD guidelines to support clinical goals (HbA1c <7.0%, BP <130/80, LDL <100 mg/dL or lower). They are not medical advice. Always consult your doctor.',
+    'meal_warning_saturated_fat':
+      "Projected saturated fat exceeds today's target.",
+    'meal_warning_sodium': "Projected sodium exceeds today's target.",
+    'meal_warning_high_carbs':
+      'This meal is high in carbs for a single sitting.',
+    'meal_warning_low_fiber': 'Very low fiber in this meal.',
 
     // Profile Setup
     'profile_setup': 'Profile Setup',
@@ -290,6 +355,67 @@ class LanguageProvider extends ChangeNotifier {
     'food_recognition': 'የምግብ ማወቅ',
     'meal': 'ምግብ',
     'food_details_unavailable': 'የምግብ ዝርዝር አልተገኘም',
+    'review_meal_guidance': 'የምግብ መመሪያን ይመልከቱ',
+    'edit_portion': 'መጠኑን ያስተካክሉ',
+    'suggest_alternatives': 'አማራጮችን ጠቁም',
+    'add_anyway': 'እንደዚሁ ጨምር',
+    'suggested_alternatives': 'የተጠቆሙ አማራጮች',
+    'alternative_lower_salt':
+      'ጨው ለመቀነስ: ብዙ ጨው ካለባቸው ወጦች ጋር የሚበላውን እንጀራ ያነሱ።',
+    'alternative_lower_carb':
+      'ካርቦሃይድሬት ለመቀነስ: አትክልቶችን፣ ጥራጥሬዎችን እና አነስ ያሉ የእህል መጠኖችን ይምረጡ።',
+    'alternative_higher_fiber':
+      'ፋይበር ለመጨመር: ጎመን፣ ካቦጅ፣ ቃሌ ወይም ባቄላ ይጨምሩ።',
+    'meal_type_label': 'የምግብ አይነት',
+    'analyzing_food': 'ምግብዎን በመተንተን ላይ...',
+    'add_missing_foods_or_ingredients': 'የጎደሉ ምግቦች ወይም ንጥረ ነገሮችን ጨምር',
+    'search_missing_food': 'የጎደለ ምግብ ፈልግ',
+    'search_missing_food_desc':
+      'ሙሉ ዝርዝሩን ከመጫን ይልቅ ምግቡን ይፈልጉ።',
+    'search_extra_ingredient': 'ተጨማሪ ንጥረ ነገር ፈልግ',
+    'search_extra_ingredient_desc':
+      'ዝርዝር ሳይንቀሳቀሱ የጎደለውን ብቻ ይጨምሩ።',
+    'add_food_image': 'የምግብ ምስል ጨምር',
+    'camera': 'ካሜራ',
+    'gallery': 'ጋለሪ',
+    'no_analysis_result_to_save': 'ለማስቀመጥ የትንተና ውጤት የለም',
+    'no_foods_found_to_save':
+      'ምንም ምግብ አልተገኘም። ከውጤቶቹ በታች ያሉትን የፍለጋ መቆጣጠሪያዎች ተጠቅመው ምግቦችን ያክሉ።',
+    'meal_saved': 'ምግቡ ተመዝግቧል!',
+    'calories_logged': 'ካሎሪ ተመዝግቧል።',
+    'no_food_items_detected': 'ምንም የምግብ አይነት አልተገኘም። ሌላ ፎቶ ይሞክሩ።',
+    'total_estimated_calories': 'ጠቅላላ የተገመተ ካሎሪ',
+    'detected_foods': 'የተገኙ ምግቦች',
+    'detected_item': 'የተገኘ እቃ',
+    'detected_items': 'የተገኙ እቃዎች',
+    'not_in_database_choose_correct_food':
+      'በመረጃ ቋቱ ውስጥ የለም - ትክክለኛውን ምግብ ይምረጡ',
+    'change_detected_food': 'የተገኘውን ምግብ ቀይር',
+    'select_correct_food': 'ትክክለኛውን ምግብ ይምረጡ',
+    'meal_guidance': 'የምግብ መመሪያ',
+    'sodium': 'ሶዲየም',
+    'saturated_fat': 'ሳቹሬትድ ስብ',
+    'todays_sodium': 'የዛሬ ሶዲየም',
+    'used': 'ተጠቅመዋል',
+    'add_a_food_image': 'የምግብ ምስል ያክሉ',
+    'analysis_complete': 'ትንተናው ተጠናቋል',
+    'save_to_history': 'ወደ ታሪክ አስቀምጥ',
+    'total': 'ጠቅላላ',
+    'search_food_items': 'የምግብ እቃዎችን ፈልግ',
+    'search_foods_min_query': 'ምግቦችን ለመፈለግ ቢያንስ 2 ፊደላት ያስገቡ።',
+    'no_matching_foods_found': 'ተመሳሳይ ምግቦች አልተገኙም።',
+    'search_foods_failed': 'ምግቦችን መፈለግ አልተሳካም። እንደገና ይሞክሩ።',
+    'search_extra_ingredients': 'ተጨማሪ ንጥረ ነገሮችን ፈልግ',
+    'search_ingredients_min_query': 'ንጥረ ነገሮችን ለመፈለግ ቢያንስ 2 ፊደላት ያስገቡ።',
+    'no_matching_ingredients_found': 'ተመሳሳይ ንጥረ ነገሮች አልተገኙም።',
+    'search_ingredients_failed':
+      'ንጥረ ነገሮችን መፈለግ አልተሳካም። እንደገና ይሞክሩ።',
+    'nutrition_disclaimer':
+      'እነዚህ የ2026 ADA/AHA/የኢትዮጵያ NCD መመሪያዎችን መሰረት ያደረጉ አጠቃላይ የአመጋገብ ግቦች ናቸው። የህክምና ምክር አይደሉም፤ ሁልጊዜ ሀኪምዎን ያማክሩ።',
+    'meal_warning_saturated_fat': 'የተገመተው ሳቹሬትድ ስብ የዛሬውን ግብ ይበልጣል።',
+    'meal_warning_sodium': 'የተገመተው ሶዲየም የዛሬውን ግብ ይበልጣል።',
+    'meal_warning_high_carbs': 'ይህ ምግብ ለአንድ ጊዜ መመገቢያ ከፍተኛ ካርቦሃይድሬት አለው።',
+    'meal_warning_low_fiber': 'በዚህ ምግብ ውስጥ ፋይበር በጣም ዝቅተኛ ነው።',
 
     // Profile Setup
     'profile_setup': 'የመገለጫ ማዋቀር',

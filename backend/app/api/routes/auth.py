@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.db.supabase import get_supabase, get_supabase_admin
 from app.schemas.user import UserCreate, UserLogin, AuthResponse
+from app.services.user_health_conditions import get_user_profile_with_health
 
 router = APIRouter()
 
@@ -76,6 +77,8 @@ async def register(payload: UserCreate):
         )
         profile = insert_result.data[0]
 
+    profile = get_user_profile_with_health(admin, user_id, include_health_conditions=False) or profile
+
     # Handle case where email confirmation is required (session will be None)
     if not auth_response.session:
         return AuthResponse(
@@ -122,15 +125,13 @@ async def login(payload: UserLogin):
 
     # Fetch the user's profile
     admin = get_supabase_admin()
-    profile = (
-        admin.table("profiles")
-        .select("*")
-        .eq("id", str(auth_response.user.id))
-        .maybe_single()
-        .execute()
+    profile = get_user_profile_with_health(
+        admin,
+        str(auth_response.user.id),
+        include_health_conditions=False,
     )
 
-    if not profile.data:
+    if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User profile not found.",
@@ -139,5 +140,5 @@ async def login(payload: UserLogin):
     return AuthResponse(
         access_token=auth_response.session.access_token,
         refresh_token=auth_response.session.refresh_token,
-        user=profile.data,
+        user=profile,
     )

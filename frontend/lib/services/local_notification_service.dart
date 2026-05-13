@@ -6,6 +6,8 @@ import 'package:timezone/timezone.dart' as tz;
 class LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  static const int _mealReminderBaseId = 1000;
+  static const int _mealReminderLimit = 10;
 
   static Future<void> initialize() async {
     tz.initializeTimeZones();
@@ -60,10 +62,7 @@ class LocalNotificationService {
     required String title,
     required String body,
   }) async {
-    // Cancel previous meal reminders (IDs 1000-1099)
-    for (int i = 1000; i < 1000 + 10; i++) {
-      await _plugin.cancel(i);
-    }
+    await cancelMealReminders();
 
     const androidDetails = AndroidNotificationDetails(
       'ethiocal_meal_reminders',
@@ -80,7 +79,7 @@ class LocalNotificationService {
 
     final location = tz.local;
 
-    for (int i = 0; i < reminderTimes.length && i < 10; i++) {
+    for (int i = 0; i < reminderTimes.length && i < _mealReminderLimit; i++) {
       final parts = reminderTimes[i].split(':');
       if (parts.length != 2) continue;
 
@@ -105,7 +104,7 @@ class LocalNotificationService {
 
       try {
         await _plugin.zonedSchedule(
-          1000 + i,
+          _mealReminderBaseId + i,
           title,
           body,
           scheduledDate,
@@ -116,10 +115,16 @@ class LocalNotificationService {
           matchDateTimeComponents: DateTimeComponents.time,
         );
         debugPrint(
-            'Scheduled meal reminder at ${reminderTimes[i]} (id: ${1000 + i})');
+            'Scheduled meal reminder at ${reminderTimes[i]} (id: ${_mealReminderBaseId + i})');
       } catch (e) {
         debugPrint('Failed to schedule notification: $e');
       }
+    }
+  }
+
+  static Future<void> cancelMealReminders() async {
+    for (int i = 0; i < _mealReminderLimit; i++) {
+      await _plugin.cancel(_mealReminderBaseId + i);
     }
   }
 

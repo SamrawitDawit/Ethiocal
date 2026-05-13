@@ -30,6 +30,7 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().loadPreferences();
       context.read<NotificationProvider>().loadUnreadCount();
     });
   }

@@ -19,7 +19,7 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> loadPreferences() async {
     try {
       _preferences = await NotificationService.getPreferences();
-      _syncLocalSchedule();
+      await _syncLocalSchedule();
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -38,7 +38,7 @@ class NotificationProvider extends ChangeNotifier {
         healthAlerts: healthAlerts,
         reminderTimes: reminderTimes,
       );
-      _syncLocalSchedule();
+      await _syncLocalSchedule();
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -47,18 +47,17 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   /// Sync local scheduled notifications with server preferences.
-  void _syncLocalSchedule() {
+  Future<void> _syncLocalSchedule() async {
     if (_preferences == null) return;
 
     if (_preferences!.mealReminders && _preferences!.reminderTimes.isNotEmpty) {
-      LocalNotificationService.scheduleMealReminders(
+      await LocalNotificationService.scheduleMealReminders(
         reminderTimes: _preferences!.reminderTimes,
         title: 'Time to log your meal!',
         body: "Don't forget to log your meal to stay on track with your nutrition goals.",
       );
     } else {
-      // Reminders disabled -- cancel all scheduled
-      LocalNotificationService.cancelAll();
+      await LocalNotificationService.cancelMealReminders();
     }
   }
 

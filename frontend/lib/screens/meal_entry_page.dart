@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../models/food_model.dart';
+import '../providers/notification_provider.dart';
 import '../services/api_service.dart';
 import '../services/meal_service.dart';
 import '../widgets/app_background.dart';
+
+enum _QuantityEntryUnit { serving, grams }
+
+class _QuantityEditorResult {
+  final double value;
+  final _QuantityEntryUnit unit;
+
+  const _QuantityEditorResult({
+    required this.value,
+    required this.unit,
+  });
+}
 
 class MealEntryPage extends StatefulWidget {
   const MealEntryPage({super.key});
@@ -92,6 +106,221 @@ class _MealEntryPageState extends State<MealEntryPage> {
       return Map<String, dynamic>.from(progress);
     }
     return {};
+  }
+
+  String _formatQuantityValue(double value) {
+    return value.toStringAsFixed(value == value.toInt() ? 0 : 1);
+  }
+
+  double _foodServingStepGrams(SelectedFoodItem item) {
+    return item.foodItem.standardServingSize > 0
+        ? item.foodItem.standardServingSize
+        : 100.0;
+  }
+
+  double _ingredientServingStepGrams(Ingredient ingredient) {
+    return ingredient.standardServingSize > 0
+        ? ingredient.standardServingSize
+        : 10.0;
+  }
+
+  String _foodQuantitySummary(SelectedFoodItem item) {
+    return '${_formatQuantityValue(item.servingEquivalent)} serving${item.servingEquivalent == 1 ? '' : 's'} • ${_formatQuantityValue(item.quantityInGrams)} g';
+  }
+
+  Future<_QuantityEditorResult?> _showQuantityEditorDialog({
+    required String title,
+    required String helperText,
+    required double initialValue,
+    required _QuantityEntryUnit initialUnit,
+    required String servingLabel,
+  }) async {
+    final controller = TextEditingController(
+      text: _formatQuantityValue(initialValue),
+    );
+    var selectedUnit = initialUnit;
+    String? errorText;
+
+    try {
+      return await showDialog<_QuantityEditorResult>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              final fieldLabel = selectedUnit == _QuantityEntryUnit.serving
+                  ? servingLabel
+                  : 'Grams';
+
+              return AlertDialog(
+                title: Text(title),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      helperText,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: Text(servingLabel),
+                          selected: selectedUnit == _QuantityEntryUnit.serving,
+                          onSelected: (_) {
+                            setDialogState(() {
+                              selectedUnit = _QuantityEntryUnit.serving;
+                              errorText = null;
+                            });
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Grams'),
+                          selected: selectedUnit == _QuantityEntryUnit.grams,
+                          onSelected: (_) {
+                            setDialogState(() {
+                              selectedUnit = _QuantityEntryUnit.grams;
+                              errorText = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: fieldLabel,
+                        errorText: errorText,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      final parsed = double.tryParse(controller.text.trim());
+                      if (parsed == null || parsed <= 0) {
+                        setDialogState(() {
+                          errorText = 'Enter a value greater than 0.';
+                        });
+                        return;
+                      }
+
+                      Navigator.pop(
+                        dialogContext,
+                        _QuantityEditorResult(
+                          value: parsed,
+                          unit: selectedUnit,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                    ),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _editFoodQuantity(SelectedFoodItem item) async {
+    final servingStepGrams = _foodServingStepGrams(item);
+    final result = await _showQuantityEditorDialog(
+      title: 'Edit ${item.foodItem.displayName}',
+      helperText:
+          '1 serving for this dish is assumed as ${_formatQuantityValue(servingStepGrams)} g. Nutrition is recalculated from the database\'s per-100 g values.',
+      initialValue: item.servingEquivalent,
+      initialUnit: _QuantityEntryUnit.serving,
+      servingLabel: 'Servings',
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      item.quantity = result.unit == _QuantityEntryUnit.grams
+          ? result.value / servingStepGrams
+          : result.value;
+      item.isGramBased = false;
+    });
+    _scheduleMealTargetCheck();
+  }
+
+  Future<void> _editIngredientQuantity(
+    SelectedIngredientPerFood adjustment,
+  ) async {
+    final servingStepGrams = _ingredientServingStepGrams(adjustment.ingredient);
+    final result = await _showQuantityEditorDialog(
+      title: 'Edit ${adjustment.ingredient.name}',
+      helperText:
+          'Standard amount for this dish is ${_formatQuantityValue(adjustment.standardQuantity)} g. One quick serving step for this ingredient is about ${_formatQuantityValue(servingStepGrams)} g.',
+      initialValue: adjustment.quantity,
+      initialUnit: _QuantityEntryUnit.grams,
+      servingLabel: 'Servings',
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      adjustment.quantity = result.unit == _QuantityEntryUnit.grams
+          ? result.value
+          : result.value * servingStepGrams;
+    });
+    _scheduleMealTargetCheck();
+  }
+
+  void _increaseIngredientQuantity(SelectedIngredientPerFood adjustment) {
+    setState(() {
+      adjustment.quantity += _ingredientServingStepGrams(adjustment.ingredient);
+    });
+    _scheduleMealTargetCheck();
+  }
+
+  void _decreaseIngredientQuantity(
+    String foodItemId,
+    SelectedIngredientPerFood adjustment,
+  ) {
+    final foodAdjustments = _userAdjustmentsPerFood[foodItemId];
+    if (foodAdjustments == null) {
+      return;
+    }
+
+    final stepGrams = _ingredientServingStepGrams(adjustment.ingredient);
+    final nextQuantity =
+        adjustment.quantity > stepGrams ? adjustment.quantity - stepGrams : 0.0;
+
+    setState(() {
+      if (adjustment.standardQuantity == 0 && nextQuantity <= 0) {
+        foodAdjustments.remove(adjustment.ingredient.id);
+      } else {
+        adjustment.quantity = nextQuantity;
+      }
+    });
+    _scheduleMealTargetCheck();
   }
 
   Future<bool> _showMealWarningDialog() async {
@@ -237,7 +466,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
       );
 
       if (existingKey.isNotEmpty) {
-        foodAdjustments[existingKey]!.quantity += 1;
+        foodAdjustments[existingKey]!.quantity +=
+            _ingredientServingStepGrams(item);
       } else {
         // Get standard quantity for this ingredient in this food
         final stdIngredients =
@@ -252,9 +482,12 @@ class _MealEntryPageState extends State<MealEntryPage> {
             createdAt: '',
           ),
         );
+        final initialQuantity = stdIng.standardQuantity > 0
+            ? stdIng.standardQuantity
+            : _ingredientServingStepGrams(item);
         foodAdjustments[item.id] = SelectedIngredientPerFood(
           ingredient: item,
-          quantity: 1.0,
+          quantity: initialQuantity,
           standardQuantity: stdIng.standardQuantity,
         );
       }
@@ -262,19 +495,6 @@ class _MealEntryPageState extends State<MealEntryPage> {
     }
     setState(() {});
     _scheduleMealTargetCheck();
-  }
-
-  void _removeIngredient(String foodItemId, String ingredientId) {
-    final foodAdjustments = _userAdjustmentsPerFood[foodItemId];
-    if (foodAdjustments != null && foodAdjustments.containsKey(ingredientId)) {
-      if (foodAdjustments[ingredientId]!.quantity > 1) {
-        foodAdjustments[ingredientId]!.quantity -= 1;
-      } else {
-        foodAdjustments.remove(ingredientId);
-      }
-      setState(() {});
-      _scheduleMealTargetCheck();
-    }
   }
 
   Future<void> _openFoodSearch() async {
@@ -317,6 +537,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
       return;
     }
 
+    final notificationProvider = context.read<NotificationProvider>();
+
     setState(() => _isLoading = true);
 
     try {
@@ -326,6 +548,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
       );
 
       if (!openIngredientEditor) {
+        await notificationProvider.checkHealthAlerts();
         setState(() => _isLoading = false);
         _showSuccess(
           'Meal saved! ${response.totalCalories.toStringAsFixed(0)} calories logged.',
@@ -412,7 +635,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
             id: ing.id,
             foodItemId: ing.foodItemId,
             ingredientId: ing.ingredientId,
-            standardQuantity: ing.standardQuantity * selectedFood.quantity,
+            standardQuantity:
+                ing.standardQuantity * selectedFood.servingEquivalent,
             ingredient: ing.ingredient,
             createdAt: ing.createdAt,
           );
@@ -451,6 +675,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
   Future<void> _addIngredientsToMeal() async {
     if (_createdMealId == null) return;
 
+    final notificationProvider = context.read<NotificationProvider>();
+
     setState(() => _isLoading = true);
 
     try {
@@ -477,6 +703,8 @@ class _MealEntryPageState extends State<MealEntryPage> {
         mealId: _createdMealId!,
         foodItemIngredients: foodItemIngredients,
       );
+
+      await notificationProvider.checkHealthAlerts();
 
       _showSuccess(
           'Ingredients saved! Total: ${(response['new_total_calories'] as num).toStringAsFixed(0)} calories');
@@ -715,6 +943,30 @@ class _MealEntryPageState extends State<MealEntryPage> {
         const SizedBox(height: 10),
         _buildFoodDropdown(),
         const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.blobYellow.withOpacity(0.25),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  color: AppColors.darkGreen, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Quick +/- uses each dish\'s standard serving size. The database stores nutrition per 100 g, and Edit amount lets you enter exact grams.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         if (_selectedFoods.isNotEmpty) ...[
           Text(
             'Selected Foods',
@@ -772,6 +1024,22 @@ class _MealEntryPageState extends State<MealEntryPage> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                const SizedBox(height: 4),
+                Text(
+                  _foodQuantitySummary(item),
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  '1 serving ≈ ${_formatQuantityValue(_foodServingStepGrams(item))} g',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
                 Text(
                   '${item.totalCalories.toStringAsFixed(0)} cal',
                   style: GoogleFonts.poppins(
@@ -783,10 +1051,19 @@ class _MealEntryPageState extends State<MealEntryPage> {
               ],
             ),
           ),
-          _buildQuantityControl(
-            quantity: item.quantity,
-            onDecrease: () => _removeFood(index),
-            onIncrease: () => _addFood(item.foodItem),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildQuantityControl(
+                quantity: item.servingEquivalent,
+                onDecrease: () => _removeFood(index),
+                onIncrease: () => _addFood(item.foodItem),
+              ),
+              TextButton(
+                onPressed: () => _editFoodQuantity(item),
+                child: const Text('Edit amount'),
+              ),
+            ],
           ),
         ],
       ),
@@ -810,7 +1087,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Adjust cooking ingredients per dish. Standard amounts are included in each dish\'s calories.',
+                  'Adjust cooking ingredients per dish. Standard amounts are stored in grams, quick +/- uses one ingredient serving step, and Edit amount lets you enter exact grams.',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: AppColors.textPrimary,
@@ -1041,7 +1318,7 @@ class _MealEntryPageState extends State<MealEntryPage> {
                 Row(
                   children: [
                     Text(
-                      'Standard: ${adjustment.standardQuantity.toStringAsFixed(1)}',
+                      'Standard: ${_formatQuantityValue(adjustment.standardQuantity)} g',
                       style: GoogleFonts.poppins(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -1074,6 +1351,13 @@ class _MealEntryPageState extends State<MealEntryPage> {
                   ],
                 ),
                 Text(
+                  'Selected: ${_formatQuantityValue(adjustment.quantity)} g • ${_formatQuantityValue(adjustment.servingEquivalent)} servings',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
                   '${adjustedCalories >= 0 ? '+' : ''}${adjustedCalories.toStringAsFixed(0)} cal',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
@@ -1086,16 +1370,20 @@ class _MealEntryPageState extends State<MealEntryPage> {
               ],
             ),
           ),
-          _buildQuantityControl(
-            quantity: adjustment.quantity,
-            onDecrease: () =>
-                _removeIngredient(foodItemId, adjustment.ingredient.id),
-            onIncrease: () {
-              setState(() {
-                adjustment.quantity += 1;
-              });
-              _scheduleMealTargetCheck();
-            },
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildQuantityControl(
+                quantity: adjustment.quantity,
+                onDecrease: () =>
+                    _decreaseIngredientQuantity(foodItemId, adjustment),
+                onIncrease: () => _increaseIngredientQuantity(adjustment),
+              ),
+              TextButton(
+                onPressed: () => _editIngredientQuantity(adjustment),
+                child: const Text('Edit amount'),
+              ),
+            ],
           ),
         ],
       ),

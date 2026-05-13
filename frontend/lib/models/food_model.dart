@@ -44,12 +44,10 @@ class FoodItem {
   });
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
-    final nameEnglish = ((json['name_english'] ?? json['name']) as String?)
-      ?.trim();
-    final descriptionEnglish =
-      (json['description_english'] as String?)?.trim();
-    final descriptionAmharic =
-      (json['description_amharic'] as String?)?.trim();
+    final nameEnglish =
+        ((json['name_english'] ?? json['name']) as String?)?.trim();
+    final descriptionEnglish = (json['description_english'] as String?)?.trim();
+    final descriptionAmharic = (json['description_amharic'] as String?)?.trim();
 
     return FoodItem(
       id: json['id'],
@@ -161,20 +159,48 @@ class SelectedFoodItem {
   final FoodItem foodItem;
   double quantity;
   String? mealFoodItemId; // Will be set after meal creation
+  bool isGramBased;
 
   SelectedFoodItem({
     required this.foodItem,
     this.quantity = 1.0,
     this.mealFoodItemId,
+    this.isGramBased = false,
   });
 
-  double get totalCalories => foodItem.caloriesPerServing * quantity;
-  double get totalProtein => foodItem.protein * quantity;
-  double get totalCarbs => foodItem.carbohydrates * quantity;
-  double get totalFat => foodItem.fat * quantity;
-  double get totalSaturatedFatG => foodItem.saturatedFatG * quantity;
-  double get totalFiber => foodItem.fiber * quantity;
-  double get totalSodiumMg => foodItem.sodiumMg * quantity;
+  double get quantityInGrams {
+    if (isGramBased) {
+      return quantity;
+    }
+
+    final standardServingSize = foodItem.standardServingSize;
+    if (standardServingSize <= 0) {
+      return quantity * 100.0;
+    }
+
+    return quantity * standardServingSize;
+  }
+
+  double get servingEquivalent {
+    final standardServingSize = foodItem.standardServingSize;
+    if (standardServingSize <= 0) {
+      return quantityInGrams / 100.0;
+    }
+
+    return quantityInGrams / standardServingSize;
+  }
+
+  double _per100gTotal(double nutrientPer100g) {
+    return (quantityInGrams / 100.0) * nutrientPer100g;
+  }
+
+  double get totalCalories => _per100gTotal(foodItem.caloriesPerServing);
+  double get totalProtein => _per100gTotal(foodItem.protein);
+  double get totalCarbs => _per100gTotal(foodItem.carbohydrates);
+  double get totalFat => _per100gTotal(foodItem.fat);
+  double get totalSaturatedFatG => _per100gTotal(foodItem.saturatedFatG);
+  double get totalFiber => _per100gTotal(foodItem.fiber);
+  double get totalSodiumMg => _per100gTotal(foodItem.sodiumMg);
 }
 
 class SelectedIngredient {
@@ -274,7 +300,8 @@ class MealFoodItemIngredient {
 class SelectedIngredientPerFood {
   final Ingredient ingredient;
   double quantity;
-  double standardQuantity; // The standard amount for this ingredient in this food item
+  double
+      standardQuantity; // The standard amount for this ingredient in this food item
 
   SelectedIngredientPerFood({
     required this.ingredient,
@@ -286,5 +313,14 @@ class SelectedIngredientPerFood {
   double get adjustedCalories {
     final diff = quantity - standardQuantity;
     return (diff / 100.0) * ingredient.caloriesPerServing;
+  }
+
+  double get servingEquivalent {
+    final standardServingSize = ingredient.standardServingSize;
+    if (standardServingSize <= 0) {
+      return quantity / 100.0;
+    }
+
+    return quantity / standardServingSize;
   }
 }

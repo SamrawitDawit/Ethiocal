@@ -11,7 +11,7 @@
 -- 1. Profiles table (User)
 -- =============================================
 -- Extends the built-in auth.users table with
--- app-specific fields including health data.
+-- app-specific demographic and calorie goal data.
 -- =============================================
 
 create table if not exists public.profiles (
@@ -28,11 +28,6 @@ create table if not exists public.profiles (
     weight              float check (weight > 0 or weight is null),
     activity_level      text check (activity_level in ('Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active') or activity_level is null),
     daily_calorie_goal  float default 2000.0,
-    has_diabetes        boolean default false,
-    has_hypertension    boolean default false,
-    has_high_cholesterol boolean default false,
-    diabetes_type       text check (diabetes_type in ('Type 1', 'Type 2') or diabetes_type is null),
-    latest_hba1c        float check (latest_hba1c > 0 or latest_hba1c is null),
     created_at          timestamptz default now(),
     updated_at          timestamptz default now()
 );
@@ -76,7 +71,7 @@ create policy "Users can insert own profile"
 create table if not exists public.health_conditions (
     id                  uuid primary key default gen_random_uuid(),
     condition_name      text not null unique,
-    restricted_nutrient text not null check (restricted_nutrient in ('Sugar', 'Sodium', 'Fat', 'Cholesterol')),
+    restricted_nutrient text not null check (restricted_nutrient in ('Carbohydrates', 'Sodium', 'Fat', 'Cholesterol')),
     threshold_amount    float not null check (threshold_amount > 0),
     threshold_unit      text not null check (threshold_unit in ('mg', 'g', 'kcal')),
     created_at          timestamptz default now()
@@ -100,7 +95,7 @@ create policy "Admins can manage health conditions"
 
 -- Seed health conditions
 insert into public.health_conditions (condition_name, restricted_nutrient, threshold_amount, threshold_unit) values
-    ('Diabetes', 'Sugar', 25, 'g'),
+    ('Diabetes', 'Carbohydrates', 25, 'g'),
     ('Hypertension', 'Sodium', 1500, 'mg'),
     ('Heart Disease', 'Cholesterol', 200, 'mg'),
     ('Obesity', 'Fat', 65, 'g')
@@ -115,6 +110,7 @@ create table if not exists public.user_health_conditions (
     id                  uuid primary key default gen_random_uuid(),
     user_id             uuid not null references public.profiles(id) on delete cascade,
     health_condition_id uuid not null references public.health_conditions(id) on delete cascade,
+    condition_metadata  jsonb not null default '{}'::jsonb,
     created_at          timestamptz default now(),
     unique(user_id, health_condition_id)
 );
@@ -506,7 +502,7 @@ create policy "Users can insert own profile"
 create table if not exists public.health_condition (
     id                   uuid primary key default gen_random_uuid(),
     condition_name       text not null unique,
-    restricted_nutrients text check (restricted_nutrients in ('Sugar', 'Sodium', 'Fat', 'Cholesterol')),
+    restricted_nutrients text check (restricted_nutrients in ('Carbohydrates', 'Sodium', 'Fat', 'Cholesterol')),
     threshold_amount     float check (threshold_amount > 0),
     threshold_unit       text check (threshold_unit in ('mg', 'g', 'kcal')),
     created_at           timestamptz default now()

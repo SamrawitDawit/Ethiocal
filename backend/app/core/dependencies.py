@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db.supabase import get_supabase_admin
+from app.services.user_health_conditions import get_user_profile_with_health
 
 # HTTPBearer extracts the token from "Authorization: Bearer <token>"
 security = HTTPBearer()
@@ -41,22 +42,15 @@ async def get_current_user(
             detail="Invalid or expired token.",
         )
 
-    # Fetch the user's profile from the profiles table
-    result = (
-        supabase.table("profiles")
-        .select("*")
-        .eq("id", str(auth_user.id))
-        .single()
-        .execute()
-    )
+    profile = get_user_profile_with_health(supabase, str(auth_user.id))
 
-    if not result.data:
+    if not profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User profile not found. Complete registration first.",
         )
 
-    return result.data
+    return profile
 
 
 async def get_current_admin(

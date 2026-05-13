@@ -9,8 +9,140 @@ from app.schemas.notification import (
     SendReminderRequest,
     SendHealthAlertRequest,
 )
+from app.services.user_health_conditions import get_user_health_conditions
 
 router = APIRouter()
+
+
+def _load_notification_preferences(supabase, user_id: str, *, create_if_missing: bool = False) -> dict:
+    result = (
+        supabase.table("notification_preferences")
+        .select("*")
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    preferences = (getattr(result, "data", None) or {}) if result else {}
+    if preferences or not create_if_missing:
+        return preferences
+
+    insert_result = (
+        supabase.table("notification_preferences")
+        .insert({"user_id": user_id})
+        .execute()
+    )
+    inserted_rows = (getattr(insert_result, "data", None) or []) if insert_result else []
+    return inserted_rows[0] if inserted_rows else {}
+
+
+def _canonical_nutrient_name(nutrient: str | None) -> str | None:
+    normalized = str(nutrient or "").strip().lower()
+    if normalized in {"carbohydrate", "carbohydrates", "carb", "carbs"}:
+        return "carbohydrates"
+    if normalized in {"sugar", "sugars"}:
+        return "sugar"
+    if normalized in {"sodium", "sodium_mg"}:
+        return "sodium"
+    if normalized in {"fat", "total_fat"}:
+        return "fat"
+    if normalized in {"cholesterol", "cholesterol_mg"}:
+        return "cholesterol"
+    return None
+
+
+def _build_daily_nutrient_totals(supabase, user_id: str, start: str, end: str):
+    meals_result = (
+        supabase.table("meals")
+        .select("id, image_url")
+        .eq("user_id", user_id)
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .execute()
+    )
+
+    meals = meals_result.data or []
+    if not meals:
+        return None, {
+            "carbohydrates": 0.0,
+            "sugar": 0.0,
+            "sodium": 0.0,
+            "fat": 0.0,
+            "cholesterol": 0.0,
+        }
+
+    meal_map = {meal["id"]: meal for meal in meals}
+    meal_ids = list(meal_map.keys())
+
+    totals = {
+        "carbohydrates": 0.0,
+        "sugar": 0.0,
+        "sodium": 0.0,
+        "fat": 0.0,
+        "cholesterol": 0.0,
+    }
+
+    food_items_result = (
+        supabase.table("meal_food_items")
+        .select(
+            "meal_id, quantity, food_item:food_items(carbohydrates, sugar, sodium_mg, fat, cholesterol_mg, standard_serving_size)"
+        )
+        .in_("meal_id", meal_ids)
+        .execute()
+    )
+
+    for item in food_items_result.data or []:
+        food_item = item.get("food_item") or {}
+        meal = meal_map.get(item.get("meal_id"), {})
+        quantity = float(item.get("quantity") or 0.0)
+        if meal.get("image_url"):
+            scale = quantity / 100.0
+        else:
+            scale = quantity * float(food_item.get("standard_serving_size", 100.0)) / 100.0
+
+        totals["carbohydrates"] += scale * float(food_item.get("carbohydrates", 0.0))
+        totals["sugar"] += scale * float(food_item.get("sugar", 0.0))
+        totals["sodium"] += scale * float(food_item.get("sodium_mg", 0.0))
+        totals["fat"] += scale * float(food_item.get("fat", 0.0))
+        totals["cholesterol"] += scale * float(food_item.get("cholesterol_mg", 0.0))
+
+    meal_ingredients_result = (
+        supabase.table("meal_ingredients")
+        .select(
+            "meal_id, quantity, ingredient:ingredients(carbohydrates, sugar, sodium_mg, fat, cholesterol_mg)"
+        )
+        .in_("meal_id", meal_ids)
+        .execute()
+    )
+
+    for item in meal_ingredients_result.data or []:
+        ingredient = item.get("ingredient") or {}
+        scale = float(item.get("quantity") or 0.0) / 100.0
+        totals["carbohydrates"] += scale * float(ingredient.get("carbohydrates", 0.0))
+        totals["sugar"] += scale * float(ingredient.get("sugar", 0.0))
+        totals["sodium"] += scale * float(ingredient.get("sodium_mg", 0.0))
+        totals["fat"] += scale * float(ingredient.get("fat", 0.0))
+        totals["cholesterol"] += scale * float(ingredient.get("cholesterol_mg", 0.0))
+
+    meal_food_item_ingredients_result = (
+        supabase.table("meal_food_item_ingredients")
+        .select(
+            "meal_id, quantity_diff, ingredient:ingredients(carbohydrates, sugar, sodium_mg, fat, cholesterol_mg)"
+        )
+        .in_("meal_id", meal_ids)
+        .execute()
+    )
+
+    for item in meal_food_item_ingredients_result.data or []:
+        ingredient = item.get("ingredient") or {}
+        scale = float(item.get("quantity_diff") or 0.0) / 100.0
+        totals["carbohydrates"] += scale * float(ingredient.get("carbohydrates", 0.0))
+        totals["sugar"] += scale * float(ingredient.get("sugar", 0.0))
+        totals["sodium"] += scale * float(ingredient.get("sodium_mg", 0.0))
+        totals["fat"] += scale * float(ingredient.get("fat", 0.0))
+        totals["cholesterol"] += scale * float(ingredient.get("cholesterol_mg", 0.0))
+
+    return meal_ids, totals
 
 
 # --- Notification Preferences ---
@@ -23,24 +155,7 @@ async def get_notification_preferences(
     supabase = get_supabase_admin()
     user_id = current_user["id"]
 
-    result = (
-        supabase.table("notification_preferences")
-        .select("*")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-
-    if not result.data:
-        # Auto-create default preferences
-        insert_result = (
-            supabase.table("notification_preferences")
-            .insert({"user_id": user_id})
-            .execute()
-        )
-        return insert_result.data[0]
-
-    return result.data
+    return _load_notification_preferences(supabase, user_id, create_if_missing=True)
 
 
 @router.patch("/preferences", response_model=NotificationPreferencesResponse)
@@ -61,15 +176,9 @@ async def update_notification_preferences(
     user_id = current_user["id"]
 
     # Ensure preferences row exists
-    existing = (
-        supabase.table("notification_preferences")
-        .select("id")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    existing = _load_notification_preferences(supabase, user_id)
 
-    if not existing.data:
+    if not existing:
         insert_result = (
             supabase.table("notification_preferences")
             .insert({"user_id": user_id, **update_data})
@@ -187,15 +296,9 @@ async def send_reminder(
     user_id = current_user["id"]
 
     # Check if user has meal reminders enabled
-    prefs = (
-        supabase.table("notification_preferences")
-        .select("meal_reminders")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    prefs = _load_notification_preferences(supabase, user_id)
 
-    if prefs.data and not prefs.data.get("meal_reminders", True):
+    if not prefs.get("meal_reminders", True):
         return {"message": "Meal reminders are disabled for this user."}
 
     # Create the notification
@@ -227,53 +330,12 @@ async def check_health_alerts(
     user_id = current_user["id"]
 
     # Check if user has health alerts enabled
-    prefs = (
-        supabase.table("notification_preferences")
-        .select("health_alerts")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    prefs = _load_notification_preferences(supabase, user_id)
 
-    if prefs.data and not prefs.data.get("health_alerts", True):
+    if not prefs.get("health_alerts", True):
         return {"message": "Health alerts are disabled.", "alerts_sent": 0}
 
-    # Get user's health conditions
-    # Try the new schema first (profile_health_conditions via user_profile)
-    user_profile_result = (
-        supabase.table("user_profile")
-        .select("id")
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-
-    conditions = []
-    if user_profile_result.data:
-        profile_id = user_profile_result.data["id"]
-        phc_result = (
-            supabase.table("profile_health_conditions")
-            .select("condition_id, condition:health_condition(*)")
-            .eq("profile_id", profile_id)
-            .execute()
-        )
-        for entry in phc_result.data:
-            cond = entry.get("condition")
-            if cond:
-                conditions.append(cond)
-
-    # Fallback: also check the old schema (user_health_conditions)
-    if not conditions:
-        old_result = (
-            supabase.table("user_health_conditions")
-            .select("health_condition_id, health_conditions(*)")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        for entry in old_result.data:
-            cond = entry.get("health_conditions")
-            if cond:
-                conditions.append(cond)
+    conditions = get_user_health_conditions(supabase, user_id)
 
     if not conditions:
         return {"message": "No health conditions configured.", "alerts_sent": 0}
@@ -285,39 +347,23 @@ async def check_health_alerts(
     start = f"{today}T00:00:00+00:00"
     end = f"{today}T23:59:59+00:00"
 
-    meals_result = (
-        supabase.table("meals")
-        .select("id")
+    meal_ids, nutrient_totals = _build_daily_nutrient_totals(supabase, user_id, start, end)
+
+    if not meal_ids:
+        return {"message": "No meals logged today.", "alerts_sent": 0}
+
+    existing_alerts_result = (
+        supabase.table("notifications")
+        .select("title")
         .eq("user_id", user_id)
+        .eq("type", "health_alert")
         .gte("created_at", start)
         .lte("created_at", end)
         .execute()
     )
-
-    if not meals_result.data:
-        return {"message": "No meals logged today.", "alerts_sent": 0}
-
-    meal_ids = [m["id"] for m in meals_result.data]
-
-    food_items_result = (
-        supabase.table("meal_food_items")
-        .select("quantity, food_item:food_items(sodium_mg, sugar, fat, cholesterol_mg, calories_per_100g, standard_serving_size)")
-        .in_("meal_id", meal_ids)
-        .execute()
-    )
-
-    # Aggregate nutrients
-    nutrient_map = {"Sugar": 0.0, "Sodium": 0.0, "Fat": 0.0, "Cholesterol": 0.0}
-    for item in food_items_result.data:
-        fi = item.get("food_item", {})
-        qty = item.get("quantity", 1.0)
-        serving = fi.get("standard_serving_size", 100.0)
-        scale = qty * serving / 100.0
-
-        nutrient_map["Sugar"] += (fi.get("sugar", 0) or 0) * scale
-        nutrient_map["Sodium"] += (fi.get("sodium_mg", 0) or 0) * scale
-        nutrient_map["Fat"] += (fi.get("fat", 0) or 0) * scale
-        nutrient_map["Cholesterol"] += (fi.get("cholesterol_mg", 0) or 0) * scale
+    existing_titles = {
+        str(item.get("title") or "") for item in (existing_alerts_result.data or [])
+    }
 
     # Check thresholds and send alerts
     alerts_sent = 0
@@ -328,23 +374,30 @@ async def check_health_alerts(
         # Support both schemas: old uses restricted_nutrient (singular),
         # new uses restricted_nutrients (plural)
         nutrient = condition.get("restricted_nutrient") or condition.get("restricted_nutrients")
-        threshold = condition.get("threshold_amount", 0)
+        canonical_nutrient = _canonical_nutrient_name(nutrient)
+        if canonical_nutrient is None:
+            continue
+
+        threshold = float(condition.get("threshold_amount") or 0.0)
         unit = condition.get("threshold_unit", "g")
         condition_name = condition.get("condition_name", "")
-        current = nutrient_map.get(nutrient, 0)
+        current = float(nutrient_totals.get(canonical_nutrient, 0.0))
 
-        if current > threshold:
+        title = f"Health Alert: {condition_name}"
+
+        if current > threshold and title not in existing_titles:
             notification = {
                 "user_id": user_id,
                 "type": "health_alert",
-                "title": f"Health Alert: {condition_name}",
+                "title": title,
                 "body": (
-                    f"Your daily {nutrient.lower()} intake ({current:.1f}{unit}) "
+                    f"Your daily {str(nutrient).lower()} intake ({current:.1f}{unit}) "
                     f"has exceeded the recommended limit of {threshold:.1f}{unit} "
                     f"for {condition_name}. Please watch your diet."
                 ),
             }
             supabase.table("notifications").insert(notification).execute()
             alerts_sent += 1
+            existing_titles.add(title)
 
     return {"message": f"{alerts_sent} alert(s) sent.", "alerts_sent": alerts_sent}

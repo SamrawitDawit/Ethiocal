@@ -71,7 +71,7 @@ class UserProfileDataUpdate(BaseModel):
 class HealthConditionCreate(BaseModel):
     """Create a new health condition (admin only)."""
     condition_name: str
-    restricted_nutrient: Literal["Sugar", "Sodium", "Fat", "Cholesterol"]
+    restricted_nutrient: Literal["Carbohydrates", "Sodium", "Fat", "Cholesterol"]
     threshold_amount: float
     threshold_unit: Literal["mg", "g", "kcal"]
 

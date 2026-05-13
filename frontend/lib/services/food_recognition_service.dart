@@ -63,7 +63,10 @@ class FoodRecognitionService {
     // Build food items with actual portion grams as quantity
     final foodItems = <SelectedFoodItem>[];
     for (final prediction in detectedFoods) {
-      final item = SelectedFoodItem(foodItem: prediction.foodItem!);
+      final item = SelectedFoodItem(
+        foodItem: prediction.foodItem!,
+        isGramBased: true,
+      );
       // Store actual portion grams as quantity (AI-estimated value)
       item.quantity = prediction.portionGrams ?? 150.0;
       foodItems.add(item);

@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import '../constants/app_constants.dart';
 import '../providers/language_provider.dart';
+import '../providers/notification_provider.dart';
 import '../widgets/app_background.dart';
 import '../widgets/food_detection_overlay.dart';
 import '../models/food_recognition_model.dart';
@@ -90,7 +91,6 @@ class FoodRecognitionPage extends StatefulWidget {
 class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   File? _selectedImage;
   Uint8List? _webImage;
-  String? _imageFilename;
   bool _isAnalyzing = false;
   String? _errorMessage;
   FoodRecognitionResponse? _recognitionResult;
@@ -113,6 +113,43 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   bool _isCheckingMealTargets = false;
   String? _mealTargetCheckError;
   int _mealTargetCheckVersion = 0;
+
+  LanguageProvider get _language => context.read<LanguageProvider>();
+
+  String _t(String key) => _language.t(key);
+
+  String _localizedMealTypeLabel(String mealType) => _t(mealType);
+
+  String _localizedMealWarning(String warning) {
+    switch (warning) {
+      case "Projected saturated fat exceeds today's target.":
+        return _t('meal_warning_saturated_fat');
+      case "Projected sodium exceeds today's target.":
+        return _t('meal_warning_sodium');
+      case 'This meal is high in carbs for a single sitting.':
+        return _t('meal_warning_high_carbs');
+      case 'Very low fiber in this meal.':
+        return _t('meal_warning_low_fiber');
+      default:
+        return warning;
+    }
+  }
+
+  String _detectedItemsLabel(int count) {
+    final key = count == 1 ? 'detected_item' : 'detected_items';
+    return '$count ${_t(key)}';
+  }
+
+  String _localizedIngredientName(Ingredient ingredient) {
+    if (_language.isAmharic) {
+      final amharicName = ingredient.nameAmharic?.trim();
+      if (amharicName != null && amharicName.isNotEmpty) {
+        return amharicName;
+      }
+    }
+
+    return ingredient.name;
+  }
 
   Widget _buildImageWidget() {
     if (kIsWeb && _webImage != null) {
@@ -279,7 +316,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   Future<void> _openAdditionalFoodSearch() async {
     final selectedFood = await showSearch<FoodItem?>(
       context: context,
-      delegate: _FoodSearchDelegate(),
+      delegate: _FoodSearchDelegate(_language),
     );
 
     if (!mounted || selectedFood == null) {
@@ -292,7 +329,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   Future<void> _openAdditionalIngredientSearch() async {
     final selectedIngredient = await showSearch<Ingredient?>(
       context: context,
-      delegate: _IngredientSearchDelegate(),
+      delegate: _IngredientSearchDelegate(_language),
     );
 
     if (!mounted || selectedIngredient == null) {
@@ -309,7 +346,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
 
     final selectedFood = await showSearch<FoodItem?>(
       context: context,
-      delegate: _FoodSearchDelegate(),
+      delegate: _FoodSearchDelegate(_language),
     );
 
     if (!mounted || selectedFood == null || _recognitionResult == null) {
@@ -410,21 +447,6 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
     return detected +
         _additionalFoods.fold(0.0, (sum, item) => sum + item.totalCarbs) +
         _additionalIngredients.fold(0.0, (sum, item) => sum + item.totalCarbs);
-  }
-
-  double get _totalFat {
-    final detected = _recognitionResult?.predictions
-            .where((prediction) => prediction.foodItem != null)
-            .fold(0.0, (sum, prediction) {
-          final food = prediction.foodItem!;
-          final portionGrams = _portionGramsForPrediction(prediction);
-          return sum + food.fat * (portionGrams / 100.0);
-        }) ??
-        0.0;
-
-    return detected +
-        _additionalFoods.fold(0.0, (sum, item) => sum + item.totalFat) +
-        _additionalIngredients.fold(0.0, (sum, item) => sum + item.totalFat);
   }
 
   double get _totalSaturatedFatG {
@@ -561,7 +583,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
     final choice = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Review meal guidance'),
+        title: Text(_t('review_meal_guidance')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -570,12 +592,12 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               ..._mealWarnings.map(
                 (warning) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('• $warning'),
+                  child: Text('• ${_localizedMealWarning(warning)}'),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                ApiConstants.nutritionDisclaimer,
+                _t('nutrition_disclaimer'),
                 style: GoogleFonts.poppins(
                     fontSize: 12, color: AppColors.textSecondary),
               ),
@@ -585,20 +607,21 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Edit portion'),
+            child: Text(_t('edit_portion')),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context, false);
               _showAlternativeSuggestions();
             },
-            child: const Text('Suggest alternatives'),
+            child: Text(_t('suggest_alternatives')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen),
-            child: const Text('Add anyway'),
+              backgroundColor: AppColors.primaryGreen,
+            ),
+            child: Text(_t('add_anyway')),
           ),
         ],
       ),
@@ -608,36 +631,36 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   }
 
   void _showAlternativeSuggestions() {
-    showModalBottomSheet(
+    showDialog<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
+      builder: (context) => AlertDialog(
+        title: Text(_t('suggested_alternatives')),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Suggested alternatives',
-                style: GoogleFonts.poppins(
-                    fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
             Text(
-                'Lower-salt: choose less injera with stews that are heavily salted.',
-                style: GoogleFonts.poppins(fontSize: 13)),
+              _t('alternative_lower_salt'),
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
             const SizedBox(height: 8),
             Text(
-                'Lower-carb: favor vegetables, legumes, and smaller grain portions.',
-                style: GoogleFonts.poppins(fontSize: 13)),
+              _t('alternative_lower_carb'),
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
             const SizedBox(height: 8),
             Text(
-                'Higher-fiber: add greens, cabbage, kale, or beans where possible.',
-                style: GoogleFonts.poppins(fontSize: 13)),
+              _t('alternative_higher_fiber'),
+              style: GoogleFonts.poppins(fontSize: 13),
+            ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_t('ok')),
+          ),
+        ],
       ),
     );
   }
@@ -647,47 +670,42 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Meal Type',
+          _t('meal_type_label'),
           style: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 10),
-        Row(
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: _mealTypes.map((type) {
-            final isSelected = _selectedMealType == type;
-            return Expanded(
-              child: GestureDetector(
-                onTap: _isAnalyzing
-                    ? null
-                    : () => setState(() => _selectedMealType = type),
-                child: Container(
-                  margin:
-                      EdgeInsets.only(right: type != _mealTypes.last ? 8 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
+            final isSelected = type == _selectedMealType;
+
+            return InkWell(
+              onTap: () => setState(() => _selectedMealType = type),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primaryGreen : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
                     color: isSelected
                         ? AppColors.primaryGreen
-                        : AppColors.inputFill,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.primaryGreen
-                          : AppColors.inputBorder,
-                    ),
+                        : AppColors.inputBorder,
                   ),
-                  child: Center(
-                    child: Text(
-                      type[0].toUpperCase() + type.substring(1),
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            isSelected ? Colors.white : AppColors.textSecondary,
-                      ),
-                    ),
+                ),
+                child: Text(
+                  _localizedMealTypeLabel(type),
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color:
+                        isSelected ? Colors.white : AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -703,7 +721,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Analyzing your food...',
+          _t('analyzing_food'),
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -752,22 +770,22 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildAnalysisNutrientCard(
-                  'Protein',
+                  _t('protein'),
                   _calculateTotalNutrient((food) => food.protein),
                   'g',
-                  Color(0xFF4A90E2),
+                  const Color(0xFF4A90E2),
                 ),
                 _buildAnalysisNutrientCard(
-                  'Carbs',
+                  _t('carbs'),
                   _calculateTotalNutrient((food) => food.carbohydrates),
                   'g',
-                  Color(0xFF52C7A1),
+                  const Color(0xFF52C7A1),
                 ),
                 _buildAnalysisNutrientCard(
-                  'Fiber',
+                  _t('fiber'),
                   _calculateTotalNutrient((food) => food.fiber),
                   'g',
-                  Color(0xFF9B59B6),
+                  const Color(0xFF9B59B6),
                 ),
               ],
             ),
@@ -798,13 +816,16 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
     Color cardColor;
     switch (label) {
       case 'Protein':
-        cardColor = Color(0xFF4A90E2);
+      case 'ፕሮቲን':
+        cardColor = const Color(0xFF4A90E2);
         break;
       case 'Carbs':
-        cardColor = Color(0xFF52C7A1);
+      case 'ካርቦሃይድሬት':
+        cardColor = const Color(0xFF52C7A1);
         break;
       case 'Fiber':
-        cardColor = Color(0xFF9B59B6);
+      case 'ፋይበር':
+        cardColor = const Color(0xFF9B59B6);
         break;
       default:
         cardColor = AppColors.primaryGreen;
@@ -912,7 +933,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
       children: [
         const SizedBox(height: 16),
         Text(
-          'Add Missing Foods or Ingredients',
+          _t('add_missing_foods_or_ingredients'),
           style: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -921,8 +942,8 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         ),
         const SizedBox(height: 12),
         _buildSearchTrigger(
-          title: 'Search for a missing food',
-          subtitle: 'Find the dish instead of loading the full food list.',
+          title: _t('search_missing_food'),
+          subtitle: _t('search_missing_food_desc'),
           onTap: _openAdditionalFoodSearch,
         ),
         // Added foods
@@ -934,8 +955,8 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         ],
         const SizedBox(height: 12),
         _buildSearchTrigger(
-          title: 'Search for an extra ingredient',
-          subtitle: 'Add only what is missing instead of scrolling a dropdown.',
+          title: _t('search_extra_ingredient'),
+          subtitle: _t('search_extra_ingredient_desc'),
           onTap: _openAdditionalIngredientSearch,
         ),
         // Added ingredients
@@ -1011,6 +1032,8 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
   }
 
   Widget _buildAdditionalFoodCard(int index, SelectedFoodItem item) {
+    final title = item.foodItem.localizedTitle(_language.isAmharic);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -1026,14 +1049,14 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.foodItem.displayName,
+                  title,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (item.foodItem.nameAmharic != null)
+                if (!_language.isAmharic && item.foodItem.nameAmharic != null)
                   Text(
                     item.foodItem.nameAmharic!,
                     style: GoogleFonts.poppins(
@@ -1080,14 +1103,14 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.ingredient.name,
+                  _localizedIngredientName(item.ingredient),
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (item.ingredient.nameAmharic != null)
+                if (!_language.isAmharic && item.ingredient.nameAmharic != null)
                   Text(
                     item.ingredient.nameAmharic!,
                     style: GoogleFonts.poppins(
@@ -1153,115 +1176,6 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
     );
   }
 
-  void _showImageSourceOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Add Food Image',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Camera option
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromCamera();
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primaryGreen.withOpacity(0.1),
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: AppColors.primaryGreen,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Camera',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Gallery option
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromGallery();
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primaryGreen.withOpacity(0.1),
-                        ),
-                        child: const Icon(
-                          Icons.photo_library,
-                          color: AppColors.primaryGreen,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Gallery',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _analyzeImage(Uint8List imageBytes, String filename) async {
     setState(() {
       _isAnalyzing = true;
@@ -1315,9 +1229,11 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
 
   Future<void> _saveMealToHistory() async {
     if (_recognitionResult == null) {
-      _showError('No analysis result to save');
+      _showError(_t('no_analysis_result_to_save'));
       return;
     }
+
+    final notificationProvider = context.read<NotificationProvider>();
 
     // Check if we have at least some foods (either detected or manually added)
     final hasDetectedFoods =
@@ -1325,8 +1241,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
     final hasAdditionalFoods = _additionalFoods.isNotEmpty;
 
     if (!hasDetectedFoods && !hasAdditionalFoods) {
-      _showError(
-          'No foods found. Please add foods using the search controls below the results.');
+      _showError(_t('no_foods_found_to_save'));
       return;
     }
 
@@ -1365,13 +1280,15 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         }
       }
 
+      await notificationProvider.checkHealthAlerts();
+
       _showSuccess(
-          'Meal saved! ${_totalCalories.toStringAsFixed(0)} calories logged.');
+          '${_t('meal_saved')} ${_totalCalories.toStringAsFixed(0)} ${_t('calories_logged')}');
       if (mounted) {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      _showError('Error: ${e.toString()}');
+      _showError('${_t('error')}: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -1393,14 +1310,14 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
           } else {
             _selectedImage = File(pickedFile.path);
           }
-          _imageFilename = filename;
         });
 
         await _analyzeImage(bytes, filename);
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('${_t('error')}: $e')),
       );
     }
   }
@@ -1419,14 +1336,14 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
           } else {
             _selectedImage = File(pickedFile.path);
           }
-          _imageFilename = filename;
         });
 
         await _analyzeImage(bytes, filename);
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('${_t('error')}: $e')),
       );
     }
   }
@@ -1470,7 +1387,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'No food items detected. Try taking another photo.',
+            _t('no_food_items_detected'),
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -1503,7 +1420,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
             child: Column(
               children: [
                 Text(
-                  'Total Estimated Calories',
+                  _t('total_estimated_calories'),
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.9),
@@ -1519,7 +1436,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                   ),
                 ),
                 Text(
-                  '${_recognitionResult!.count} detected item${_recognitionResult!.count > 1 ? 's' : ''}',
+                  _detectedItemsLabel(_recognitionResult!.count),
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.8),
@@ -1537,19 +1454,19 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildNutrientCard(
-                  'Protein',
+                  _t('protein'),
                   _calculateTotalNutrient((food) => food.protein),
                   'g',
                   Icons.favorite,
                 ),
                 _buildNutrientCard(
-                  'Carbs',
+                  _t('carbs'),
                   _calculateTotalNutrient((food) => food.carbohydrates),
                   'g',
                   Icons.local_fire_department,
                 ),
                 _buildNutrientCard(
-                  'Fiber',
+                  _t('fiber'),
                   _calculateTotalNutrient((food) => food.fiber),
                   'g',
                   Icons.nature,
@@ -1564,7 +1481,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
 
           // Detected foods
           Text(
-            'Detected Foods',
+            _t('detected_foods'),
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -1653,7 +1570,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                                         size: 14, color: Colors.orange),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Not in database - choose the correct food',
+                                      _t('not_in_database_choose_correct_food'),
                                       style: GoogleFonts.poppins(
                                         fontSize: 11,
                                         color: Colors.orange,
@@ -1706,7 +1623,9 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     onPressed: () => _editDetectedFood(index),
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     label: Text(
-                      hasMatch ? 'Change detected food' : 'Select the correct food',
+                      hasMatch
+                          ? _t('change_detected_food')
+                          : _t('select_correct_food'),
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -1806,8 +1725,9 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                 value: percent,
                 minHeight: 6,
                 backgroundColor: AppColors.inputBorder,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryGreen,
+                ),
               ),
             ),
           ],
@@ -1828,11 +1748,18 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.health_and_safety, color: AppColors.primaryGreen),
+              const Icon(
+                Icons.health_and_safety,
+                color: AppColors.primaryGreen,
+              ),
               const SizedBox(width: 8),
-              Text('Meal guidance',
-                  style: GoogleFonts.poppins(
-                      fontSize: 15, fontWeight: FontWeight.w600)),
+              Text(
+                _t('meal_guidance'),
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               if (_isCheckingMealTargets) ...[
                 const SizedBox(width: 8),
                 const SizedBox(
@@ -1847,26 +1774,26 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
             ..._mealWarnings.map(
               (warning) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text('• $warning',
+                child: Text('• ${_localizedMealWarning(warning)}',
                     style: GoogleFonts.poppins(
                         fontSize: 12, color: AppColors.error)),
               ),
             ),
           ],
           const SizedBox(height: 12),
-          progressBar('Sodium', progress['sodium_percent']),
-          progressBar('Saturated fat', progress['saturated_fat_percent']),
-          progressBar('Fiber', progress['fiber_percent']),
-          progressBar('Carbs', progress['carbs_percent']),
+          progressBar(_t('sodium'), progress['sodium_percent']),
+          progressBar(_t('saturated_fat'), progress['saturated_fat_percent']),
+          progressBar(_t('fiber'), progress['fiber_percent']),
+          progressBar(_t('carbs'), progress['carbs_percent']),
           const SizedBox(height: 8),
           Text(
-            'Today\'s sodium: ${(progress['sodium_percent'] as num?)?.toStringAsFixed(0) ?? '0'}% used',
+            '${_t('todays_sodium')}: ${(progress['sodium_percent'] as num?)?.toStringAsFixed(0) ?? '0'}% ${_t('used')}',
             style: GoogleFonts.poppins(
                 fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
-            ApiConstants.nutritionDisclaimer,
+            _t('nutrition_disclaimer'),
             style: GoogleFonts.poppins(
                 fontSize: 11, color: AppColors.textSecondary, height: 1.4),
           ),
@@ -1908,7 +1835,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     ),
                     const SizedBox(width: 16),
                     Text(
-                      'Food Recognition',
+                      language.t('food_recognition'),
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -1922,7 +1849,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
               // Status text
               if (!_isAnalyzing && !hasImage)
                 Text(
-                  'Add a food image',
+                  language.t('add_a_food_image'),
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -1933,7 +1860,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                   _recognitionResult != null &&
                   _recognitionResult!.hasPredictions)
                 Text(
-                  'Analysis Complete',
+                  language.t('analysis_complete'),
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -2042,7 +1969,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                                   ),
                                 )
                               : Text(
-                                  'Save to History',
+                                  language.t('save_to_history'),
                                   style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -2052,7 +1979,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Total: ${_totalCalories.toStringAsFixed(0)} kcal',
+                        '${language.t('total')}: ${_totalCalories.toStringAsFixed(0)} kcal',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -2112,7 +2039,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Camera',
+                      _t('camera'),
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -2147,7 +2074,7 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Gallery',
+                      _t('gallery'),
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -2166,7 +2093,10 @@ class _FoodRecognitionPageState extends State<FoodRecognitionPage> {
 }
 
 class _FoodSearchDelegate extends SearchDelegate<FoodItem?> {
-  _FoodSearchDelegate() : super(searchFieldLabel: 'Search food items');
+  _FoodSearchDelegate(this.lang)
+      : super(searchFieldLabel: lang.t('search_food_items'));
+
+  final LanguageProvider lang;
 
   String _lastQuery = '';
   Future<List<FoodItem>>? _lastSearch;
@@ -2206,14 +2136,15 @@ class _FoodSearchDelegate extends SearchDelegate<FoodItem?> {
   Widget buildResults(BuildContext context) {
     return _SearchResultsList<FoodItem>(
       query: query,
-      minQueryMessage: 'Type at least 2 letters to search foods.',
-      emptyMessage: 'No matching foods found.',
-      errorMessage: 'Failed to search foods. Please try again.',
+      minQueryMessage: lang.t('search_foods_min_query'),
+      emptyMessage: lang.t('no_matching_foods_found'),
+      errorMessage: lang.t('search_foods_failed'),
       loadResults: _searchFoods,
       itemBuilder: (context, food) {
+        final title = food.localizedTitle(lang.isAmharic);
         return ListTile(
           title: Text(
-            food.displayName,
+            title,
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -2247,8 +2178,10 @@ class _FoodSearchDelegate extends SearchDelegate<FoodItem?> {
 }
 
 class _IngredientSearchDelegate extends SearchDelegate<Ingredient?> {
-  _IngredientSearchDelegate()
-      : super(searchFieldLabel: 'Search extra ingredients');
+  _IngredientSearchDelegate(this.lang)
+      : super(searchFieldLabel: lang.t('search_extra_ingredients'));
+
+  final LanguageProvider lang;
 
   String _lastQuery = '';
   Future<List<Ingredient>>? _lastSearch;
@@ -2288,14 +2221,19 @@ class _IngredientSearchDelegate extends SearchDelegate<Ingredient?> {
   Widget buildResults(BuildContext context) {
     return _SearchResultsList<Ingredient>(
       query: query,
-      minQueryMessage: 'Type at least 2 letters to search ingredients.',
-      emptyMessage: 'No matching ingredients found.',
-      errorMessage: 'Failed to search ingredients. Please try again.',
+      minQueryMessage: lang.t('search_ingredients_min_query'),
+      emptyMessage: lang.t('no_matching_ingredients_found'),
+      errorMessage: lang.t('search_ingredients_failed'),
       loadResults: _searchIngredients,
       itemBuilder: (context, ingredient) {
+        final title = lang.isAmharic &&
+                ingredient.nameAmharic != null &&
+                ingredient.nameAmharic!.trim().isNotEmpty
+            ? ingredient.nameAmharic!
+            : ingredient.name;
         return ListTile(
           title: Text(
-            ingredient.name,
+            title,
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w500,
