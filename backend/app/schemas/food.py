@@ -147,16 +147,26 @@ class SegmentationMask(BaseModel):
     area: float | None = None  # Area of the mask in pixels
 
 
+class DepthData(BaseModel):
+    """Depth and volume estimation data for a detected food item."""
+    mean_relative_height: float  # Relative height from plate baseline
+    pixel_area: int  # Area in pixels
+    height_cm: float | None = None  # Real-world height in centimeters
+    estimated_volume_cm3: float | None = None  # Real-world volume in cubic centimeters
+    calibration: dict | None = None  # Plate calibration information
+
+
 class FoodRecognitionResult(BaseModel):
     """AI model prediction for a single food item in an image."""
     label: str
     confidence: float
     bounding_box: BoundingBox | None = None
     mask: SegmentationMask | None = None
+    depth_data: DepthData | None = None  # depth and volume estimation
     food_item: FoodItemResponse | None = None  # matched DB entry, if found
     portion_grams: float | None = None  # estimated portion size in grams
     estimated_calories: float | None = None  # calculated calories based on portion
-    estimation_method: str | None = None  # 'mask_area' or 'standard_serving'
+    estimation_method: str | None = None  # 'mask_area', 'depth_volume', or 'standard_serving'
 
 
 class FoodRecognitionResponse(BaseModel):

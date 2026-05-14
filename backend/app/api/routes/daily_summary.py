@@ -116,7 +116,7 @@ async def get_daily_summary(
         if meals_result.data:
             for meal in meals_result.data:
                 meal_type = meal['meal_type']
-                calories = meal.get('total_calories', 0)
+                calories = int(meal.get('total_calories', 0))
                 total_calories += calories
                 
                 if meal_type == 'breakfast':
