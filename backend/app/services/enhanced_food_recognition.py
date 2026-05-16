@@ -17,7 +17,6 @@ from ultralytics import YOLO
 
 from app.core.config import settings
 from app.vision_engine import FoodVolumeEstimator
-from app.services.plate_calibration import get_plate_calibrator
 
 logger = logging.getLogger(__name__)
 
@@ -84,19 +83,9 @@ def process_enhanced_results(
         depth_map: Depth map for height calibration (optional)
 
     Returns:
-        List of enhanced prediction dicts with depth/volume data
+        List of enhanced prediction dicts with heuristic estimation data
     """
     predictions = []
-    # Precompute plate calibration once per image to avoid repeated expensive detection
-    try:
-        calibrator = get_plate_calibrator()
-        # Skip expensive circle/ellipse detection on first pass - use fast fallback instead
-        # We still get plate_relative_height from depth map which is already computed
-        precomputed_calibration = calibrator.get_plate_calibration(image_np, depth_map, skip_detection=True)
-        logger.info(f"Precomputed plate calibration: {precomputed_calibration}")
-    except Exception as e:
-        logger.warning(f"Precomputing plate calibration failed: {e}")
-        precomputed_calibration = None
     
     for result in yolo_results:
         boxes = result.boxes
@@ -154,7 +143,7 @@ def process_enhanced_results(
                         "area": round(area, 2) if area else None,
                     }
             
-            # Add depth data if available
+            # Add heuristic estimation data if available
             # Match by food_type instead of index to ensure correct association
             if depth_results:
                 matching_depth = None
@@ -164,128 +153,28 @@ def process_enhanced_results(
                         break
 
                 if matching_depth:
-                    depth_data = matching_depth
-                    pixel_area = int(depth_data.get("pixel_area", 0))
-                    height_stats = depth_data.get("height_stats", {})
+                    # Use heuristic estimation data from vision engine
+                    mask_pixel_count = int(matching_depth.get("mask_pixel_count", 0))
+                    area_ratio = float(matching_depth.get("area_ratio", 0))
+                    height_stats = matching_depth.get("height_stats", {})
+                    estimated_grams = float(matching_depth.get("estimated_grams", 0))
+
+                    prediction["depth_data"] = {
+                        "pixel_area": mask_pixel_count,
+                        "area_ratio": area_ratio,
+                        "height_stats": height_stats,
+                        "estimated_grams": estimated_grams,
+                        "estimation_method": "heuristic"
+                    }
+                    logger.info(
+                        f"Heuristic estimation for {label}: "
+                        f"area_ratio={area_ratio:.4f}, "
+                        f"mound_score={height_stats.get('effective', 0):.2f}, "
+                        f"grams={estimated_grams:.1f}g"
+                    )
                 else:
                     # No matching depth data found for this label
                     continue
-
-                # Calculate real-world volume using robust height statistics
-                estimated_volume_cm3 = None
-                height_cm = None
-                calibration_data = None
-
-                if pixel_area > 0 and height_stats.get("effective", 0) > 0:
-                    try:
-                        # Use precomputed calibration when available
-                        if precomputed_calibration:
-                            calibration = precomputed_calibration
-                            pixel_to_cm_ratio = calibration["pixel_to_cm_ratio"]
-                            plate_relative_height = calibration.get("plate_relative_height")
-                        else:
-                            # Last resort: create a calibrator and compute on-demand
-                            calibrator = get_plate_calibrator()
-                            calibration = calibrator.get_plate_calibration(image_np, depth_map)
-                            pixel_to_cm_ratio = calibration["pixel_to_cm_ratio"]
-                            plate_relative_height = calibration.get("plate_relative_height")
-
-                        # Compute depth_to_cm_ratio for height conversion
-                        calibrator = get_plate_calibrator()
-                        plate_depth_cm = 2.5
-                        if plate_relative_height and plate_relative_height > 0:
-                            depth_to_cm_ratio = plate_depth_cm / plate_relative_height
-                            logger.info(f"Using plate calibration: depth_to_cm_ratio={depth_to_cm_ratio:.4f}")
-                        else:
-                            # Fallback: conservative estimate
-                            max_raw_height = height_stats.get("max", 0)
-                            if max_raw_height > 0:
-                                depth_to_cm_ratio = 5.0 / max_raw_height
-                            else:
-                                depth_to_cm_ratio = 1.0
-                            logger.info(f"Using fallback depth_to_cm_ratio={depth_to_cm_ratio:.4f}")
-
-                        # Use robust effective height (0.3*mean + 0.7*p75)
-                        effective_height_raw = float(height_stats.get("effective", 0))
-                        effective_height_cm = effective_height_raw * depth_to_cm_ratio
-                        height_cm = float(round(effective_height_cm, 2))
-
-                        # Calculate volume using area × height formula
-                        pixel_to_cm_ratio_sq = pixel_to_cm_ratio ** 2
-                        area_cm2 = pixel_area * pixel_to_cm_ratio_sq
-                        volume_cm3 = area_cm2 * effective_height_cm
-
-                        estimated_volume_cm3 = round(volume_cm3, 1)
-
-                        calibration_data = {
-                            "plate_diameter_cm": calibration.get("plate_diameter_cm"),
-                            "pixel_to_cm_ratio": round(pixel_to_cm_ratio, 4) if pixel_to_cm_ratio else None,
-                            "calibration_method": calibration.get("calibration_method") if calibration else None
-                        }
-
-                        logger.info(
-                            f"Robust height volume: "
-                            f"area={area_cm2:.1f}cm² × "
-                            f"effective_height={effective_height_cm:.2f}cm = "
-                            f"{volume_cm3:.1f}cm³ (height_stats: mean={height_stats.get('mean', 0):.2f}, p75={height_stats.get('p75', 0):.2f})"
-                        )
-
-                    except Exception as e:
-                        logger.warning(f"Robust height volume calculation failed: {e}")
-                        # Fallback: use simple estimation
-                        try:
-                            # Simple fallback: assume plate is 60% of image width
-                            image_width = image_np.shape[1]
-                            estimated_plate_pixels = image_width * 0.6
-                            fallback_pixel_to_cm = settings.PLATE_DIAMETER_CM / estimated_plate_pixels
-
-                            # Use robust height if available
-                            effective_height_raw = float(height_stats.get("effective", height_stats.get("mean", 0.5)))
-                            fallback_depth_to_cm = 1.0
-                            effective_height_cm = effective_height_raw * fallback_depth_to_cm
-                            height_cm = float(round(effective_height_cm, 2))
-
-                            # Volume = area × height
-                            pixel_to_cm_ratio_sq = fallback_pixel_to_cm ** 2
-                            area_cm2 = pixel_area * pixel_to_cm_ratio_sq
-                            volume_cm3 = area_cm2 * effective_height_cm
-
-                            estimated_volume_cm3 = round(volume_cm3, 1)
-                            calibration_data = {
-                                "plate_diameter_cm": settings.PLATE_DIAMETER_CM,
-                                "pixel_to_cm_ratio": round(fallback_pixel_to_cm, 4),
-                                "calibration_method": "fallback_robust_height"
-                            }
-
-                            logger.info(f"Fallback robust height: volume={volume_cm3:.1f}cm³, height={height_cm:.2f}cm")
-
-                        except Exception as fallback_error:
-                            logger.error(f"Fallback calculation also failed: {fallback_error}")
-                            # Last resort: use p75 height from stats
-                            p75_height = float(height_stats.get("p75", 0))
-                            if p75_height > 0:
-                                height_cm = float(round(p75_height, 2))
-                                area_cm2 = pixel_area * (settings.PLATE_DIAMETER_CM / (image_np.shape[1] * 0.6)) ** 2
-                                volume_cm3 = area_cm2 * p75_height
-                                estimated_volume_cm3 = round(volume_cm3, 1)
-                            else:
-                                estimated_volume_cm3 = None
-                                height_cm = None
-
-                            calibration_data = {
-                                "plate_diameter_cm": settings.PLATE_DIAMETER_CM,
-                                "pixel_to_cm_ratio": settings.PLATE_DIAMETER_CM / (image_np.shape[1] * 0.6),
-                                "calibration_method": "fallback_p75_height"
-                            }
-                            logger.warning(f"Using fallback p75 height: {height_cm}cm")
-
-                prediction["depth_data"] = {
-                    "pixel_area": pixel_area,
-                    "height_cm": height_cm,
-                    "estimated_volume_cm3": estimated_volume_cm3,
-                    "height_stats": height_stats,
-                    "calibration": calibration_data
-                }
 
             
             predictions.append(prediction)

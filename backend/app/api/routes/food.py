@@ -281,18 +281,18 @@ async def recognize_food(
         depth_data = None
         if pred.get("depth_data"):
             depth_data = DepthData(**pred["depth_data"])
-            logger.info(f"    Depth data: height={depth_data.height_cm}cm, volume={depth_data.estimated_volume_cm3}cm³")
-            print(f"DEBUG HEIGHT -> mean_height_cm: {depth_data.height_cm}")
+            logger.info(f"    Depth data: area_ratio={depth_data.area_ratio}, grams={depth_data.estimated_grams}")
 
         # Determine estimation method based on available data
         estimation_method = "mask_area"
-        if depth_data and depth_data.estimated_volume_cm3 and depth_data.estimated_volume_cm3 > 0:
-            estimation_method = "depth_volume"
+        if depth_data and depth_data.estimated_grams and depth_data.estimated_grams > 0:
+            estimation_method = "heuristic"
             logger.info(f"    Using estimation method: {estimation_method}")
 
         # Estimate portion size and calculate calories
         logger.info(f"    Estimating portion and calories...")
-        volume_cm3 = depth_data.estimated_volume_cm3 if depth_data else None
+        estimated_grams = depth_data.estimated_grams if depth_data else None
+        area_ratio = depth_data.area_ratio if depth_data else None
         portion_data = estimate_portion_and_calories(
             label=label,
             mask_area=mask_area,
@@ -300,10 +300,12 @@ async def recognize_food(
             image_height=image_height,
             calories_per_100g=calories_per_100g,
             standard_serving_size=standard_serving_size,
-            relative_height=None,  # No longer used with voxel integration
+            relative_height=None,  # No longer used with heuristic approach
             pixel_area=depth_data.pixel_area if depth_data else None,
-            density_g_per_cm3=density_g_per_cm3,
-            volume_cm3=volume_cm3,
+            density_g_per_cm3=None,  # No longer used with heuristic approach
+            volume_cm3=None,  # No longer used with heuristic approach
+            estimated_grams=estimated_grams,
+            area_ratio=area_ratio,
         )
         logger.info(f"    ✓ Portion: {portion_data['portion_grams']}g, Calories: {portion_data['estimated_calories']}")
 

@@ -2,10 +2,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Single fallback density (g/cm³) when no density is available in the database
-# Most foods are close to water density (1.0 g/cm³)
-FALLBACK_DENSITY_G_PER_CM3 = 0.8
-
 
 def calculate_calories(
     portion_grams: float,
@@ -27,20 +23,24 @@ def estimate_portion_and_calories(
     pixel_area: int | None = None,
     density_g_per_cm3: float | None = None,
     volume_cm3: float | None = None,
+    estimated_grams: float | None = None,
+    area_ratio: float | None = None,
 ) -> dict:
-    """Estimate portion size using voxel-integrated volume × density × structure.
+    """Estimate portion size using heuristic estimation from vision engine.
 
     Args:
         label: Food label from AI model
-        mask_area: Area of the segmentation mask (unused)
-        image_width: Width of the image in pixels (unused)
-        image_height: Height of the image in pixels (unused)
+        mask_area: Area of the segmentation mask (unused in heuristic approach)
+        image_width: Width of the image in pixels (unused in heuristic approach)
+        image_height: Height of the image in pixels (unused in heuristic approach)
         calories_per_100g: Calories per 100g from database
-        standard_serving_size: Standard serving size (unused)
-        relative_height: Relative height from depth detection (unused - replaced by voxel volume)
-        pixel_area: Pixel area from depth detection (unused - replaced by voxel volume)
-        density_g_per_cm3: Density from database (can be None)
-        volume_cm3: Pre-calculated voxel volume from depth estimator
+        standard_serving_size: Standard serving size (unused in heuristic approach)
+        relative_height: Relative height from depth detection (unused in heuristic approach)
+        pixel_area: Pixel area from depth detection (unused in heuristic approach)
+        density_g_per_cm3: Density from database (unused in heuristic approach)
+        volume_cm3: Pre-calculated voxel volume (unused in heuristic approach)
+        estimated_grams: Pre-calculated grams from heuristic estimation in vision engine
+        area_ratio: Area ratio from vision engine (for logging)
 
     Returns:
         Dict with portion_grams, estimated_calories, and estimation_method
@@ -48,32 +48,21 @@ def estimate_portion_and_calories(
     portion_grams = None
     estimation_method = "none"
 
-    # Use pre-calculated volume from voxel integration
-    if volume_cm3 is not None and volume_cm3 > 0:
-        # Get density: use database value if available, otherwise fallback
-        if density_g_per_cm3 is not None and density_g_per_cm3 > 0:
-            density = density_g_per_cm3
-            logger.info(f"Using database density for {label}: {density} g/cm³")
-        else:
-            density = FALLBACK_DENSITY_G_PER_CM3
-            logger.warning(f"No density found for {label}, using fallback: {density} g/cm³")
-
-        # Mass (grams) = Volume (cm³) × Density (g/cm³)
-        portion_grams = volume_cm3 * density
-        estimation_method = "voxel_volume_x_density"
+    # Use pre-calculated grams from heuristic estimation in vision engine
+    if estimated_grams is not None and estimated_grams > 0:
+        portion_grams = estimated_grams
+        estimation_method = "heuristic"
 
         logger.info(
             f"Portion estimation for {label}: "
-            f"volume={volume_cm3:.1f}cm³ × "
-            f"density={density:.2f}g/cm³ = "
-            f"{portion_grams:.1f}g"
+            f"grams={portion_grams:.1f}g (from heuristic estimation, area_ratio={area_ratio:.4f})"
         )
 
-    # Fallback if no volume data available
+    # Fallback if no heuristic data available
     else:
-        logger.error(f"Cannot estimate portion for {label}: No volume data available")
+        logger.error(f"Cannot estimate portion for {label}: No heuristic estimation data available")
         portion_grams = None
-        estimation_method = "failed_no_volume"
+        estimation_method = "failed_no_heuristic_data"
 
     # Calculate calories if we have portion size and nutritional data
     estimated_calories = None

@@ -84,10 +84,9 @@ class FoodVolumeEstimator:
             depth_map = self.depth_model.infer_image(frame)
             print(f"  Depth map generated: shape={depth_map.shape}")
 
-            # --- GLOBAL PLATE BASELINE CALCULATION ---
-            # Compute plate depth ONCE globally for the entire scene
-            # This is critical because monocular depth maps are only meaningful relatively within the same scene
-            print(f"  3. Computing global plate baseline...")
+            # --- COMPUTE PLATE PIXEL COUNT ---
+            # Estimate plate area by dilating combined food mask to find plate ring
+            print(f"  3. Computing plate pixel count...")
             
             # Create a combined mask of all food items
             combined_food_mask = np.zeros_like(depth_map, dtype=np.uint8)
@@ -98,14 +97,22 @@ class FoodVolumeEstimator:
                     combined_food_mask = np.maximum(combined_food_mask, (mask_resized > 0.5).astype(np.uint8))
             
             # Dilate the combined food mask to get the plate ring area around all foods
-            kernel = np.ones((15, 15), np.uint8)
-            dilated_food = cv2.dilate(combined_food_mask, kernel, iterations=3)
-            plate_ring = dilated_food - combined_food_mask
+            kernel = np.ones((30, 30), np.uint8)
+            dilated_food = cv2.dilate(combined_food_mask, kernel, iterations=5)
+            plate_mask = dilated_food - combined_food_mask
+            plate_pixel_count = int(np.sum(plate_mask > 0))
+            
+            print(f"      Plate pixel count: {plate_pixel_count}")
+            
+            # --- GLOBAL PLATE BASELINE CALCULATION ---
+            # Compute plate depth ONCE globally for the entire scene
+            # This is critical because monocular depth maps are only meaningful relatively within the same scene
+            print(f"  4. Computing global plate baseline...")
             
             # For inverse depth (smaller = closer), the plate is FARTHER
             # Use percentile instead of max for robustness against noise
-            if len(depth_map[plate_ring > 0]) > 0:
-                plate_depths = depth_map[plate_ring > 0]
+            if len(depth_map[plate_mask > 0]) > 0:
+                plate_depths = depth_map[plate_mask > 0]
                 global_plate_baseline = np.percentile(plate_depths, 90)  # Use 90th percentile for robustness
                 print(f"      Global plate baseline (90th percentile): {global_plate_baseline}")
             else:
@@ -116,67 +123,113 @@ class FoodVolumeEstimator:
             processed_data = []
 
             if yolo_results.masks is not None:
-                print(f"  4. Processing {len(yolo_results.boxes.data)} detections...")
+                print(f"  5. Processing {len(yolo_results.boxes.data)} detections...")
                 # Iterate through boxes to ensure correct mask-to-label association
                 for i in range(len(yolo_results.boxes.data)):
                     food_type = yolo_results.names[int(yolo_results.boxes.cls[i])]
                     print(f"    Processing detection {i+1} (YOLO classified as: {food_type})...")
-                    
+
                     # Get the corresponding mask for this detection
                     if i < len(yolo_results.masks.data):
                         mask = yolo_results.masks.data[i]
                     else:
                         print(f"      No mask available for detection {i+1}")
                         continue
-                
-                # Debug: Print mask info BEFORE resizing
-                    mask_np = mask.cpu().numpy()
-                    print(f"      BEFORE RESIZE - mask.shape: {mask_np.shape}")
-                    print(f"      BEFORE RESIZE - np.unique(mask): {np.unique(mask_np)}")
-                    print(f"      BEFORE RESIZE - mask.sum(): {mask_np.sum()}")
-                
-                # Resize mask to match original image dimensions
-                    mask_resized = cv2.resize(mask_np, (frame.shape[1], frame.shape[0]))
-                
-                # Debug: Print mask info AFTER resizing
-                    print(f"      AFTER RESIZE - mask.shape: {mask_resized.shape}")
-                    print(f"      AFTER RESIZE - np.unique(mask): {np.unique(mask_resized)}")
-                    print(f"      AFTER RESIZE - mask.sum(): {mask_resized.sum()}")
 
-                # 2. Find heights of food pixels
+                    # Resize mask to match original image dimensions
+                    mask_np = mask.cpu().numpy()
+                    mask_resized = cv2.resize(mask_np, (frame.shape[1], frame.shape[0]))
+
+                    # Count pixels in the binary mask
+                    mask_binary = (mask_resized > 0.5).astype(np.uint8)
+                    mask_pixel_count = int(np.sum(mask_binary))
+
+                    # Compute area ratio
+                    if plate_pixel_count > 0:
+                        area_ratio = mask_pixel_count / plate_pixel_count
+                    else:
+                        area_ratio = 0.0
+                        print(f"      Warning: plate_pixel_count is 0")
+
+                    # Compute relative depth features
                     food_depths = depth_map[mask_resized > 0]
-                
-                # For inverse depth: Height = global_plate_baseline - food_depth (closer = smaller number)
-                # This gives positive height values
+
+                    # For inverse depth: Height = global_plate_baseline - food_depth (closer = smaller number)
                     raw_heights = global_plate_baseline - food_depths
                     raw_heights = np.maximum(raw_heights, 0)  # Remove negatives
-                
-                # Get the maximum raw height for normalization
-                    max_raw_height = np.max(raw_heights) if len(raw_heights) > 0 else 1.0
-                    print(f"      Max raw height: {max_raw_height}")
-                
-                # Calculate total raw volume units by summing all pixel heights
-                    # raw_heights is already extracted from the mask, so just sum it
-                    total_raw_volume_units = float(np.sum(raw_heights))
 
-                    # Count pixels in the binary mask for pixel area
-                    mask_binary = (mask_resized > 0.5).astype(np.uint8)
-                    pixel_area = int(np.sum(mask_binary))
+                    # Remove tiny noise (threshold 0.15)
+                    significant_heights = raw_heights[raw_heights > 0.15]
 
-                    print(f"      Mask resized shape: {mask_resized.shape}")
-                    print(f"      Mask resized min/max: {mask_resized.min()}/{mask_resized.max()}")
-                    print(f"      Mask resized unique values: {np.unique(mask_resized)[:10]}")
-                    print(f"      Pixel area: {pixel_area}")
-                    print(f"      Max raw height: {max_raw_height}")
-                    print(f"      Total raw volume units: {total_raw_volume_units}")
+                    # Compute height statistics
+                    if len(significant_heights) > 0:
+                        mean_height = float(np.mean(significant_heights))
+                        p75_height = float(np.percentile(significant_heights, 75))
+                        max_height = float(np.max(significant_heights))
+                    else:
+                        # Fallback to zeros if too few significant pixels
+                        mean_height = 0.0
+                        p75_height = 0.0
+                        max_height = 0.0
+                        print(f"      Warning: Too few significant height pixels, using zeros")
 
+                    # Compute mound score
+                    mound_score = 0.7 * mean_height + 0.3 * p75_height
+                    mound_score = float(np.clip(mound_score / 4.0, 0, 2))  # Normalize to 0-2 range
+
+                    height_stats = {
+                        "mean": mean_height,
+                        "p75": p75_height,
+                        "max": max_height,
+                        "effective": mound_score
+                    }
+
+                    print(f"      Mask pixel count: {mask_pixel_count}")
+                    print(f"      Area ratio: {area_ratio:.4f}")
+                    print(f"      Height stats - mean: {mean_height:.2f}, p75: {p75_height:.2f}, max: {max_height:.2f}")
+                    print(f"      Mound score: {mound_score:.2f}")
+
+                    # STEP 5: FOOD-SPECIFIC ESTIMATION
+                    food_type_lower = food_type.lower()
+                    grams = None
+
+                    # INJERA - Depth has very little influence
+                    if "injera" in food_type_lower:
+                        grams = 220 * area_ratio
+                        grams = float(np.clip(grams, 30, 250))
+                        print(f"      INJERA estimation: {grams:.1f}g (area_ratio={area_ratio:.4f})")
+
+                    # SHIRO / MISIR / WAT - Use area + mound
+                    elif any(x in food_type_lower for x in ["shiro", "misir", "wat"]):
+                        grams = 420 * area_ratio * (1 + mound_score * 0.6)
+                        grams = float(np.clip(grams, 20, 400))
+                        print(f"      SHIRO/MISIR/WAT estimation: {grams:.1f}g (area_ratio={area_ratio:.4f}, mound_score={mound_score:.2f})")
+
+                    # GOMEN / SALAD - Lighter foods
+                    elif any(x in food_type_lower for x in ["gomen", "salad"]):
+                        grams = 250 * area_ratio * (1 + mound_score * 0.3)
+                        grams = float(np.clip(grams, 10, 250))
+                        print(f"      GOMEN/SALAD estimation: {grams:.1f}g (area_ratio={area_ratio:.4f}, mound_score={mound_score:.2f})")
+
+                    # KITFO / BOWL FOODS - Bowls explode area estimates
+                    elif any(x in food_type_lower for x in ["kitfo", "bowl"]):
+                        effective_area = np.sqrt(area_ratio)
+                        grams = 500 * effective_area * (1 + mound_score * 0.4)
+                        grams = float(np.clip(grams, 50, 450))
+                        print(f"      KITFO/BOWL estimation: {grams:.1f}g (effective_area={effective_area:.4f}, mound_score={mound_score:.2f})")
+
+                    # DEFAULT: Generic estimation for unknown foods
+                    else:
+                        grams = 300 * area_ratio * (1 + mound_score * 0.4)
+                        grams = float(np.clip(grams, 20, 350))
+                        print(f"      DEFAULT estimation: {grams:.1f}g (area_ratio={area_ratio:.4f}, mound_score={mound_score:.2f})")
 
                     processed_data.append({
                         "food_type": food_type,
-                        "pixel_area": pixel_area,
-                        "total_raw_volume_units": total_raw_volume_units,
-                        "plate_baseline": float(global_plate_baseline),
-                        "max_raw_height": float(max_raw_height)
+                        "mask_pixel_count": mask_pixel_count,
+                        "area_ratio": area_ratio,
+                        "height_stats": height_stats,
+                        "estimated_grams": grams,
                     })
             else:
                 print(f"  No masks found in YOLOv8 results")
