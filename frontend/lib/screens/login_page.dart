@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/custom_text_field.dart';
@@ -41,8 +42,12 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
 
+      final hasProfile = await ProfileService.hasProfile();
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, RouteNames.mainNavigation);
+      Navigator.pushReplacementNamed(
+        context,
+        hasProfile ? RouteNames.mainNavigation : RouteNames.profileSetupStep1,
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -61,6 +66,87 @@ class _LoginPageState extends State<LoginPage> {
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final controller =
+        TextEditingController(text: _emailController.text.trim());
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Reset password'),
+            content: TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                hintText: 'Enter your email address',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final email = controller.text.trim();
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(dialogContext);
+
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter a valid email address'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await AuthService.requestPasswordReset(email: email);
+                    if (!mounted) return;
+                    navigator.pop();
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Password reset email sent. Check your inbox.'),
+                        backgroundColor: AppColors.primaryGreen,
+                      ),
+                    );
+                  } on ApiException catch (e) {
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(e.message),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  } catch (_) {
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Network error. Please check your connection.'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Send reset link'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -194,9 +280,7 @@ class _LoginPageState extends State<LoginPage> {
                               ],
                             ),
                             GestureDetector(
-                              onTap: () {
-                                // TODO: Forgot password flow
-                              },
+                              onTap: _handleForgotPassword,
                               child: Text(
                                 'Forgot password?',
                                 style: GoogleFonts.poppins(

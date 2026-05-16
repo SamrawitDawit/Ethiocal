@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str                          # anon / public key
     SUPABASE_SERVICE_ROLE_KEY: str             # service-role key (admin access, bypasses RLS)
     SUPABASE_JWT_SECRET: str                   # for verifying Supabase-issued JWTs
+    SUPABASE_AUTH_TIMEOUT_SECONDS: int = 30    # allow slower verification/reset email dispatches
 
     # --- Image Upload ---
     MAX_IMAGE_SIZE_MB: int = 10

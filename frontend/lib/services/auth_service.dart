@@ -6,6 +6,8 @@ import 'api_service.dart';
 class AuthService {
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
+  static String? _accessTokenCache;
+  static String? _refreshTokenCache;
 
   static Future<AuthResponse> register({
     required String fullName,
@@ -18,12 +20,17 @@ class AuthService {
       'full_name': fullName,
     };
 
+    final callbackUrl = ApiConstants.authCallbackUrl;
+    if (callbackUrl.isNotEmpty) {
+      body['email_redirect_to'] = callbackUrl;
+    }
+
     final json = await ApiService.post(ApiConstants.registerEndpoint, body);
     final authResponse = AuthResponse.fromJson(json);
 
     // Only save tokens if email confirmation is not required
     if (!authResponse.emailConfirmationRequired) {
-      await _saveTokens(authResponse.accessToken, authResponse.refreshToken);
+      await saveTokens(authResponse.accessToken, authResponse.refreshToken);
     }
 
     return authResponse;
@@ -40,8 +47,49 @@ class AuthService {
 
     final json = await ApiService.post(ApiConstants.loginEndpoint, body);
     final authResponse = AuthResponse.fromJson(json);
-    await _saveTokens(authResponse.accessToken, authResponse.refreshToken);
+    await saveTokens(authResponse.accessToken, authResponse.refreshToken);
     return authResponse;
+  }
+
+  static Future<void> requestPasswordReset({required String email}) async {
+    final body = <String, dynamic>{'email': email};
+    final callbackUrl = ApiConstants.authCallbackUrl;
+    if (callbackUrl.isNotEmpty) {
+      body['redirect_to'] = callbackUrl;
+    }
+
+    await ApiService.post(ApiConstants.forgotPasswordEndpoint, body);
+  }
+
+  static Future<AuthResponse> exchangeCallback({
+    required String tokenHash,
+    required String callbackType,
+  }) async {
+    final json = await ApiService.post(
+      '/api/v1/auth/exchange-callback',
+      {
+        'token_hash': tokenHash,
+        'type': callbackType,
+      },
+    );
+
+    final authResponse = AuthResponse.fromJson(json);
+    await saveTokens(authResponse.accessToken, authResponse.refreshToken);
+    return authResponse;
+  }
+
+  static Future<void> resetPassword({required String newPassword}) async {
+    final body = <String, dynamic>{'password': newPassword};
+    final refreshToken = await getRefreshToken();
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      body['refresh_token'] = refreshToken;
+    }
+
+    await ApiService.post(
+      ApiConstants.resetPasswordEndpoint,
+      body,
+      requireAuth: true,
+    );
   }
 
   static Future<User> setupProfile({
@@ -81,18 +129,39 @@ class AuthService {
         .toList();
   }
 
-  static Future<void> _saveTokens(String access, String refresh) async {
+  static Future<void> saveTokens(String access, String refresh) async {
+    _accessTokenCache = access;
+    _refreshTokenCache = refresh;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessTokenKey, access);
     await prefs.setString(_refreshTokenKey, refresh);
   }
 
   static Future<String?> getAccessToken() async {
+    if (_accessTokenCache != null) {
+      return _accessTokenCache;
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_accessTokenKey);
+    _accessTokenCache = prefs.getString(_accessTokenKey);
+    _refreshTokenCache ??= prefs.getString(_refreshTokenKey);
+    return _accessTokenCache;
+  }
+
+  static Future<String?> getRefreshToken() async {
+    if (_refreshTokenCache != null) {
+      return _refreshTokenCache;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    _refreshTokenCache = prefs.getString(_refreshTokenKey);
+    _accessTokenCache ??= prefs.getString(_accessTokenKey);
+    return _refreshTokenCache;
   }
 
   static Future<void> clearTokens() async {
+    _accessTokenCache = null;
+    _refreshTokenCache = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessTokenKey);
     await prefs.remove(_refreshTokenKey);

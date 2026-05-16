@@ -29,9 +29,12 @@ class ProfileService {
   }) async {
     try {
       final body = <String, dynamic>{};
-      if (fullName != null) body['full_name'] = fullName;
-      if (languagePreference != null)
+      if (fullName != null) {
+        body['full_name'] = fullName;
+      }
+      if (languagePreference != null) {
         body['language_preference'] = languagePreference;
+      }
 
       final response =
           await ApiService.patch('/api/v1/users/me', body, requireAuth: true);
@@ -56,19 +59,39 @@ class ProfileService {
   }) async {
     try {
       final body = <String, dynamic>{};
-      if (age != null) body['age'] = age;
-      if (gender != null) body['gender'] = gender;
-      if (height != null) body['height'] = height;
-      if (weight != null) body['weight'] = weight;
-      if (activityLevel != null) body['activity_level'] = activityLevel;
-      if (dailyCalorieGoal != null)
+      if (age != null) {
+        body['age'] = age;
+      }
+      if (gender != null) {
+        body['gender'] = gender;
+      }
+      if (height != null) {
+        body['height'] = height;
+      }
+      if (weight != null) {
+        body['weight'] = weight;
+      }
+      if (activityLevel != null) {
+        body['activity_level'] = activityLevel;
+      }
+      if (dailyCalorieGoal != null) {
         body['daily_calorie_goal'] = dailyCalorieGoal;
-      if (hasDiabetes != null) body['has_diabetes'] = hasDiabetes;
-      if (hasHypertension != null) body['has_hypertension'] = hasHypertension;
-      if (hasHighCholesterol != null)
+      }
+      if (hasDiabetes != null) {
+        body['has_diabetes'] = hasDiabetes;
+      }
+      if (hasHypertension != null) {
+        body['has_hypertension'] = hasHypertension;
+      }
+      if (hasHighCholesterol != null) {
         body['has_high_cholesterol'] = hasHighCholesterol;
-      if (diabetesType != null) body['diabetes_type'] = diabetesType;
-      if (latestHbA1c != null) body['latest_hba1c'] = latestHbA1c;
+      }
+      if (diabetesType != null) {
+        body['diabetes_type'] = diabetesType;
+      }
+      if (latestHbA1c != null) {
+        body['latest_hba1c'] = latestHbA1c;
+      }
 
       final response = await ApiService.patch('/api/v1/users/profile', body,
           requireAuth: true);
@@ -92,27 +115,52 @@ class ProfileService {
     bool? hasHighCholesterol,
     String? diabetesType,
     double? latestHbA1c,
-    List<String> healthConditionIds = const [],
+    List<String>? healthConditionIds,
   }) async {
     try {
       final body = <String, dynamic>{};
-      if (fullName != null) body['full_name'] = fullName;
-      if (languagePreference != null)
+      if (fullName != null) {
+        body['full_name'] = fullName;
+      }
+      if (languagePreference != null) {
         body['language_preference'] = languagePreference;
-      if (age != null) body['age'] = age;
-      if (gender != null) body['gender'] = gender;
-      if (height != null) body['height'] = height;
-      if (weight != null) body['weight'] = weight;
-      if (activityLevel != null) body['activity_level'] = activityLevel;
-      if (dailyCalorieGoal != null)
+      }
+      if (age != null) {
+        body['age'] = age;
+      }
+      if (gender != null) {
+        body['gender'] = gender;
+      }
+      if (height != null) {
+        body['height'] = height;
+      }
+      if (weight != null) {
+        body['weight'] = weight;
+      }
+      if (activityLevel != null) {
+        body['activity_level'] = activityLevel;
+      }
+      if (dailyCalorieGoal != null) {
         body['daily_calorie_goal'] = dailyCalorieGoal;
-      if (hasDiabetes != null) body['has_diabetes'] = hasDiabetes;
-      if (hasHypertension != null) body['has_hypertension'] = hasHypertension;
-      if (hasHighCholesterol != null)
+      }
+      if (hasDiabetes != null) {
+        body['has_diabetes'] = hasDiabetes;
+      }
+      if (hasHypertension != null) {
+        body['has_hypertension'] = hasHypertension;
+      }
+      if (hasHighCholesterol != null) {
         body['has_high_cholesterol'] = hasHighCholesterol;
-      if (diabetesType != null) body['diabetes_type'] = diabetesType;
-      if (latestHbA1c != null) body['latest_hba1c'] = latestHbA1c;
-      body['health_condition_ids'] = healthConditionIds;
+      }
+      if (diabetesType != null) {
+        body['diabetes_type'] = diabetesType;
+      }
+      if (latestHbA1c != null) {
+        body['latest_hba1c'] = latestHbA1c;
+      }
+      if (healthConditionIds != null) {
+        body['health_condition_ids'] = healthConditionIds;
+      }
 
       final response = await ApiService.patch('/api/v1/user-profile/me', body,
           requireAuth: true);

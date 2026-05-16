@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'constants/app_constants.dart';
 import 'screens/landing_page.dart';
 import 'screens/sign_up_page.dart';
 import 'screens/login_page.dart';
+import 'screens/auth_callback_page.dart';
 import 'screens/home_page.dart';
 import 'screens/meal_entry_page.dart';
 import 'screens/main_navigation.dart';
@@ -11,6 +13,7 @@ import 'screens/history_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/food_recognition_page.dart';
 import 'screens/stats_page.dart';
+import 'screens/reset_password_page.dart';
 import 'screens/profile_setup_step1.dart';
 import 'screens/profile_setup_step2.dart';
 import 'screens/profile_setup_step2_2.dart';
@@ -22,14 +25,30 @@ import 'providers/notification_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/leaderboard_provider.dart';
 import 'services/local_notification_service.dart';
+import 'services/launch_context.dart';
 import 'screens/education_list_page.dart';
 import 'screens/education_detail_page.dart';
 import 'providers/education_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  captureInitialLaunchUri();
+  usePathUrlStrategy();
   await LocalNotificationService.initialize();
   runApp(const EthioCalApp());
+}
+
+String _resolveInitialRoute() {
+  final path = Uri.base.path;
+  if (path.isEmpty || path == '/' || path == '/index.html') {
+    return RouteNames.landing;
+  }
+
+  if (path.length > 1 && path.endsWith('/')) {
+    return path.substring(0, path.length - 1);
+  }
+
+  return path;
 }
 
 class EthioCalApp extends StatelessWidget {
@@ -57,11 +76,13 @@ class EthioCalApp extends StatelessWidget {
               scaffoldBackgroundColor: AppColors.background,
               useMaterial3: true,
             ),
-            initialRoute: RouteNames.landing,
+            initialRoute: _resolveInitialRoute(),
             routes: {
               RouteNames.landing: (context) => const LandingPage(),
               RouteNames.signUp: (context) => const SignUpPage(),
               RouteNames.login: (context) => const LoginPage(),
+              RouteNames.authCallback: (context) => const AuthCallbackPage(),
+              RouteNames.resetPassword: (context) => const ResetPasswordPage(),
               RouteNames.home: (context) => const HomePage(),
               RouteNames.mainNavigation: (context) => const MainNavigation(),
               RouteNames.mealEntry: (context) => const MealEntryPage(),
@@ -90,6 +111,9 @@ class EthioCalApp extends StatelessWidget {
                 return EducationDetailPage(articleId: articleId ?? '');
               },
             },
+            onUnknownRoute: (settings) => MaterialPageRoute<void>(
+              builder: (context) => const LandingPage(),
+            ),
           );
         },
       ),

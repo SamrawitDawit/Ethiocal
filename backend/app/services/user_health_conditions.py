@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 
@@ -191,6 +192,21 @@ def derive_health_profile(health_conditions: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+def _calculate_age_from_birthdate(birthdate_value: Any) -> int | None:
+    if birthdate_value in (None, ""):
+        return None
+
+    try:
+        birthdate = date.fromisoformat(str(birthdate_value))
+    except ValueError:
+        return None
+
+    today = date.today()
+    return today.year - birthdate.year - (
+        (today.month, today.day) < (birthdate.month, birthdate.day)
+    )
+
+
 def get_user_profile_with_health(
     supabase: Any,
     user_id: str,
@@ -209,6 +225,10 @@ def get_user_profile_with_health(
         return None
 
     profile = dict(profile_result.data)
+    calculated_age = _calculate_age_from_birthdate(profile.get("birthdate"))
+    if calculated_age is not None:
+        profile["age"] = calculated_age
+
     health_conditions = get_user_health_conditions(supabase, user_id)
     profile.update(derive_health_profile(health_conditions))
 

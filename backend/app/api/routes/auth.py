@@ -5,10 +5,19 @@
 # POST /login     — sign in via Supabase Auth
 # ============================================
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 
+from app.core.dependencies import get_current_auth_user, security
 from app.db.supabase import get_supabase, get_supabase_admin
-from app.schemas.user import UserCreate, UserLogin, AuthResponse
+from app.schemas.user import (
+    AuthCallbackExchangeRequest,
+    AuthResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    UserCreate,
+    UserLogin,
+)
 from app.services.user_health_conditions import get_user_profile_with_health
 
 router = APIRouter()
@@ -27,16 +36,19 @@ async def register(payload: UserCreate):
     Note: Health info setup is done separately via POST /api/v1/users/setup-profile.
     """
     supabase = get_supabase()
+    options = {
+        "data": {
+            "full_name": payload.full_name,
+        }
+    }
+    if payload.email_redirect_to:
+        options["email_redirect_to"] = payload.email_redirect_to
 
     try:
         auth_response = supabase.auth.sign_up({
             "email": payload.email,
             "password": payload.password,
-            "options": {
-                "data": {
-                    "full_name": payload.full_name,
-                }
-            }
+            "options": options,
         })
     except Exception as e:
         raise HTTPException(
@@ -142,3 +154,97 @@ async def login(payload: UserLogin):
         refresh_token=auth_response.session.refresh_token,
         user=profile,
     )
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest):
+    """Send a password reset email via Supabase Auth."""
+    supabase = get_supabase()
+
+    try:
+        options = {}
+        if payload.redirect_to:
+            options["redirect_to"] = payload.redirect_to
+        supabase.auth.reset_password_email(payload.email, options)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to send password reset email: {str(e)}",
+        )
+
+    return {"message": "Password reset email sent."}
+
+
+@router.post("/exchange-callback", response_model=AuthResponse)
+async def exchange_callback(payload: AuthCallbackExchangeRequest):
+    """Exchange Supabase callback parameters into an authenticated session."""
+    if not payload.token_hash or not payload.type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing token_hash or callback type.",
+        )
+
+    supabase = get_supabase()
+
+    try:
+        auth_response = supabase.auth.verify_otp(
+            {
+                "token_hash": payload.token_hash,
+                "type": payload.type,
+            }
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to exchange auth callback: {str(e)}",
+        )
+
+    if not auth_response.user or not auth_response.session:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Auth callback did not return a valid session.",
+        )
+
+    admin = get_supabase_admin()
+    profile = get_user_profile_with_health(
+        admin,
+        str(auth_response.user.id),
+        include_health_conditions=False,
+    )
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found.",
+        )
+
+    return AuthResponse(
+        access_token=auth_response.session.access_token,
+        refresh_token=auth_response.session.refresh_token,
+        user=profile,
+        email_confirmation_required=False,
+    )
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    _auth_user: dict = Depends(get_current_auth_user),
+):
+    """Update the current user's password using the recovery session."""
+    supabase = get_supabase()
+
+    try:
+        supabase.auth.set_session(
+            credentials.credentials,
+            payload.refresh_token or "",
+        )
+        supabase.auth.update_user({"password": payload.password})
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to reset password: {str(e)}",
+        )
+
+    return {"message": "Password updated successfully."}

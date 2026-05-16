@@ -71,6 +71,14 @@ def _format_ai_label(label: str | None) -> str | None:
     return " ".join(part[:1].upper() + part[1:] for part in parts)
 
 
+def _canonicalize_ai_label(label: str | None) -> str | None:
+    if not label:
+        return None
+
+    normalized = re.sub(r"[^a-z0-9]+", "_", label.casefold()).strip("_")
+    return normalized or None
+
+
 def _clean_food_text(value: str | None) -> str | None:
     if not value:
         return None
@@ -191,7 +199,7 @@ async def recognize_food(
     # --- Match labels to food items in DB and estimate portions ---
     results: list[FoodRecognitionResult] = []
     for pred in predictions:
-        label = pred["label"]
+        label = _canonicalize_ai_label(pred["label"]) or pred["label"]
         confidence = pred["confidence"]
 
         # Try to match label to food item in DB (optional - may not exist)

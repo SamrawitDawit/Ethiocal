@@ -47,7 +47,7 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
         );
         Navigator.pushNamedAndRemoveUntil(
           context,
-          RouteNames.login,
+          RouteNames.mainNavigation,
           (route) => false,
         );
       } else {
@@ -220,26 +220,45 @@ class _ProfileSetupStep3State extends State<ProfileSetupStep3> {
                 ),
                 Consumer<ProfileSetupProvider>(
                   builder: (context, provider, child) {
-                    if (!provider.isLoadingHealthConditions &&
-                        provider.healthConditionsError.isEmpty) {
-                      return Column(
-                        children: [
-                          const SizedBox(height: 40),
-
-                          // Step Indicator
-                          const StepIndicator(currentStep: 3, totalSteps: 3),
-                          const SizedBox(height: 20),
-
-                          // Finish Button
-                          PrimaryButton(
-                            text: 'Finish',
-                            isLoading: provider.isSubmitting,
-                            onPressed: () => _submitProfile(provider),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (provider.isLoadingHealthConditions) ...[
+                          const SizedBox(height: 16),
+                          const Center(child: CircularProgressIndicator()),
+                        ],
+                        if (provider.healthConditionsError.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Could not load health-condition options. You can still finish profile setup using the switches below.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: AppColors.error,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: provider.loadHealthConditions,
+                              child: const Text('Retry'),
+                            ),
                           ),
                         ],
-                      );
-                    }
-                    return const SizedBox.shrink();
+                        const SizedBox(height: 40),
+
+                        // Step Indicator
+                        const StepIndicator(currentStep: 3, totalSteps: 3),
+                        const SizedBox(height: 20),
+
+                        // Finish Button
+                        PrimaryButton(
+                          text: 'Finish',
+                          isLoading: provider.isSubmitting,
+                          onPressed: () => _submitProfile(provider),
+                        ),
+                      ],
+                    );
                   },
                 ),
               ],

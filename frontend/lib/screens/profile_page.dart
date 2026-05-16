@@ -105,12 +105,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveAllProfile() async {
     setState(() => _isSaving = true);
     try {
-      await ProfileService.updateBasicProfile(
+      final updatedProfile =
+          await ProfileService.updateProfileWithHealthConditions(
         fullName: _nameController.text.trim(),
         languagePreference: _selectedLanguage,
-      );
-
-      await ProfileService.updateProfileData(
         age: int.tryParse(_ageController.text),
         gender: _selectedGender,
         height: double.tryParse(_heightController.text),
@@ -124,7 +122,6 @@ class _ProfilePageState extends State<ProfilePage> {
         latestHbA1c: double.tryParse(_hba1cController.text),
       );
 
-      final updatedProfile = await ProfileService.getCurrentProfile();
       if (!mounted) return;
       setState(() {
         _profile = updatedProfile;

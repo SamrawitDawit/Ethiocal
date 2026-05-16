@@ -24,6 +24,13 @@ class ApiConstants {
   // Auth endpoints
   static const String registerEndpoint = '/api/v1/auth/register';
   static const String loginEndpoint = '/api/v1/auth/login';
+  static const String forgotPasswordEndpoint = '/api/v1/auth/forgot-password';
+  static const String resetPasswordEndpoint = '/api/v1/auth/reset-password';
+
+  static String get authCallbackUrl {
+    const configuredUrl = 'http://localhost:49943/auth/callback';
+    return configuredUrl;
+  }
 
   // User endpoints
   static const String setupProfileEndpoint = '/api/v1/users/setup-profile';
@@ -57,6 +64,8 @@ class RouteNames {
   static const String landing = '/';
   static const String signUp = '/sign-up';
   static const String login = '/login';
+  static const String authCallback = '/auth/callback';
+  static const String resetPassword = '/reset-password';
   static const String home = '/home';
   static const String mainNavigation = '/main';
   static const String mealEntry = '/meal-entry';

@@ -47,15 +47,16 @@ class _SignUpPageState extends State<SignUpPage> {
       if (!mounted) return;
 
       if (authResponse.emailConfirmationRequired) {
-        // Show email confirmation message and go to login
+        // Email confirmation is required before the user can continue.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account created! Please check your email to verify your account.'),
+            content: Text(
+                'Account created. Check your email, verify your account, then log in to continue setup.'),
             backgroundColor: AppColors.primaryGreen,
             duration: Duration(seconds: 5),
           ),
         );
-        Navigator.pushReplacementNamed(context, RouteNames.profileSetupStep1);
+        Navigator.pushReplacementNamed(context, RouteNames.login);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

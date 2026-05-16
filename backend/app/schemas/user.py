@@ -17,6 +17,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+    email_redirect_to: str | None = None
 
 
 # --- Login ---
@@ -25,6 +26,24 @@ class UserLogin(BaseModel):
     """Payload sent when a user logs in."""
     email: EmailStr
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Payload for sending a password reset email."""
+    email: EmailStr
+    redirect_to: str | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    """Payload for updating a password during recovery."""
+    password: str
+    refresh_token: str | None = None
+
+
+class AuthCallbackExchangeRequest(BaseModel):
+    """Payload for exchanging auth callback parameters into a session."""
+    token_hash: str | None = None
+    type: str | None = None
 
 
 # --- User Profile Setup ---
