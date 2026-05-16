@@ -127,7 +127,14 @@ class FoodVolumeEstimator:
                         normalized_heights = raw_heights
                 
                     mean_relative_height = np.mean(normalized_heights)
-                    pixel_area = np.sum(mask_resized)
+                    # Debug: check mask values before thresholding
+                    print(f"      Mask resized shape: {mask_resized.shape}")
+                    print(f"      Mask resized min/max: {mask_resized.min()}/{mask_resized.max()}")
+                    print(f"      Mask resized unique values: {np.unique(mask_resized)[:10]}")
+                    # Threshold mask to binary (0 or 1) before summing to get accurate pixel count
+                    mask_binary = (mask_resized > 0.5).astype(np.uint8)
+                    pixel_area = int(np.sum(mask_binary))
+                    print(f"      Mask binary sum: {pixel_area}")
                     print(f"      Mean relative height (normalized 0-1): {mean_relative_height}")
                     print(f"      Pixel area: {pixel_area}")
 
@@ -143,7 +150,7 @@ class FoodVolumeEstimator:
 
             print(f"  Processed {len(processed_data)} items")
             print(f"[FoodVolumeEstimator.estimate] SUCCESS")
-            return processed_data
+            return processed_data, depth_map
         except Exception as e:
             print(f" Error in estimate: {type(e).__name__}: {e}")
             import traceback

@@ -70,20 +70,33 @@ def process_enhanced_results(
     depth_results: List[Dict],
     image_width: int,
     image_height: int,
-    image_np: np.ndarray
+    image_np: np.ndarray,
+    depth_map: np.ndarray = None
 ) -> List[Dict]:
     """Process combined YOLOv8 + Depth results into structured format.
-    
+
     Args:
         yolo_results: YOLOv8 inference results
         depth_results: Depth estimation results from vision engine
         image_width: Original image width
         image_height: Original image height
-        
+        image_np: Image as numpy array
+        depth_map: Depth map for height calibration (optional)
+
     Returns:
         List of enhanced prediction dicts with depth/volume data
     """
     predictions = []
+    # Precompute plate calibration once per image to avoid repeated expensive detection
+    try:
+        calibrator = get_plate_calibrator()
+        # Skip expensive circle/ellipse detection on first pass - use fast fallback instead
+        # We still get plate_relative_height from depth map which is already computed
+        precomputed_calibration = calibrator.get_plate_calibration(image_np, depth_map, skip_detection=True)
+        logger.info(f"Precomputed plate calibration: {precomputed_calibration}")
+    except Exception as e:
+        logger.warning(f"Precomputing plate calibration failed: {e}")
+        precomputed_calibration = None
     
     for result in yolo_results:
         boxes = result.boxes
@@ -145,34 +158,53 @@ def process_enhanced_results(
             if depth_results and i < len(depth_results):
                 depth_data = depth_results[i]
                 relative_height = depth_data.get("mean_relative_height", 0)
-                pixel_area = depth_data.get("pixel_area", 0)
-                
+                pixel_area = int(depth_data.get("pixel_area", 0))
+                max_raw_height = depth_data.get("max_raw_height", None)
+
+                # Use polygon area if available (more accurate than resized mask area)
+                # Mask area can be inflated due to resizing artifacts
+                if prediction.get("mask") and prediction["mask"].get("area"):
+                    polygon_area = int(prediction["mask"]["area"])
+                    # Only use polygon area if it's reasonable (not 0 and not extremely large)
+                    if polygon_area > 0 and polygon_area < pixel_area * 2:
+                        pixel_area = polygon_area
+                        logger.info(f"Using polygon area ({polygon_area}) instead of mask pixel area ({depth_data.get('pixel_area', 0)})")
+
                 # Calculate real-world volume using plate calibration
                 estimated_volume_cm3 = None
                 height_cm = None
                 calibration_data = None
-                
+
                 if relative_height > 0 and pixel_area > 0:
                     try:
-                        calibrator = get_plate_calibrator()
-                        calibration = calibrator.get_plate_calibration(image_np)
-                        pixel_to_cm_ratio = calibration["pixel_to_cm_ratio"]
-                        
+                        # Use precomputed calibration when available
+                        if precomputed_calibration:
+                            calibration = precomputed_calibration
+                            pixel_to_cm_ratio = calibration["pixel_to_cm_ratio"]
+                            plate_relative_height = calibration.get("plate_relative_height")
+                        else:
+                            # Last resort: create a calibrator and compute on-demand
+                            calibrator = get_plate_calibrator()
+                            calibration = calibrator.get_plate_calibration(image_np, depth_map)
+                            pixel_to_cm_ratio = calibration["pixel_to_cm_ratio"]
+                            plate_relative_height = calibration.get("plate_relative_height")
+
                         # Calculate real-world measurements
+                        calibrator = get_plate_calibrator()
                         height_cm, volume_cm3 = calibrator.calculate_real_world_volume(
-                            relative_height, pixel_area, pixel_to_cm_ratio
+                            relative_height, pixel_area, pixel_to_cm_ratio, max_raw_height, plate_relative_height
                         )
-                        
+
                         estimated_volume_cm3 = round(volume_cm3, 1)
                         height_cm = round(height_cm, 2)
                         calibration_data = {
-                            "plate_diameter_cm": calibration["plate_diameter_cm"],
-                            "pixel_to_cm_ratio": round(pixel_to_cm_ratio, 4),
-                            "calibration_method": calibration["calibration_method"]
+                            "plate_diameter_cm": calibration.get("plate_diameter_cm"),
+                            "pixel_to_cm_ratio": round(pixel_to_cm_ratio, 4) if pixel_to_cm_ratio else None,
+                            "calibration_method": calibration.get("calibration_method") if calibration else None
                         }
-                        
+
                         logger.info(f"Real-world volume: {volume_cm3:.1f} cm³, height: {height_cm:.2f} cm")
-                        
+
                     except Exception as e:
                         logger.warning(f"Plate calibration failed: {e}")
                         # Fallback: use simple estimation
@@ -277,6 +309,7 @@ async def predict_food_with_depth(
         logger.info(f"  6. Checking if depth detection is enabled...")
         logger.info(f"     ENABLE_DEPTH_DETECTION={settings.ENABLE_DEPTH_DETECTION}")
         depth_results = []
+        depth_map = None
         if settings.ENABLE_DEPTH_DETECTION:
             logger.info(f"  7. Depth detection enabled, loading volume estimator...")
             try:
@@ -285,7 +318,7 @@ async def predict_food_with_depth(
                 logger.info(f"  Volume estimator loaded successfully")
 
                 logger.info(f"  8. Running depth estimation...")
-                depth_results = volume_estimator.estimate(image_np)
+                depth_results, depth_map = volume_estimator.estimate(image_np)
                 logger.info(f" Depth estimation completed for {len(depth_results)} food items")
             except Exception as e:
                 logger.error(f" Depth estimation failed: {type(e).__name__}: {e}", exc_info=True)
@@ -296,7 +329,7 @@ async def predict_food_with_depth(
         # Process combined results
         logger.info(f"  9. Processing combined results...")
         predictions = process_enhanced_results(
-            yolo_results, depth_results, image_width, image_height, image_np
+            yolo_results, depth_results, image_width, image_height, image_np, depth_map
         )
         logger.info(f" Enhanced detection completed: {len(predictions)} food items")
 
