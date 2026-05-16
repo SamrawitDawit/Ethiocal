@@ -84,65 +84,98 @@ class FoodVolumeEstimator:
             depth_map = self.depth_model.infer_image(frame)
             print(f"  Depth map generated: shape={depth_map.shape}")
 
+            # --- GLOBAL PLATE BASELINE CALCULATION ---
+            # Compute plate depth ONCE globally for the entire scene
+            # This is critical because monocular depth maps are only meaningful relatively within the same scene
+            print(f"  3. Computing global plate baseline...")
+            
+            # Create a combined mask of all food items
+            combined_food_mask = np.zeros_like(depth_map, dtype=np.uint8)
+            if yolo_results.masks is not None:
+                for mask in yolo_results.masks.data:
+                    mask_np = mask.cpu().numpy()
+                    mask_resized = cv2.resize(mask_np, (frame.shape[1], frame.shape[0]))
+                    combined_food_mask = np.maximum(combined_food_mask, (mask_resized > 0.5).astype(np.uint8))
+            
+            # Dilate the combined food mask to get the plate ring area around all foods
+            kernel = np.ones((15, 15), np.uint8)
+            dilated_food = cv2.dilate(combined_food_mask, kernel, iterations=3)
+            plate_ring = dilated_food - combined_food_mask
+            
+            # For inverse depth (smaller = closer), the plate is FARTHER
+            # Use percentile instead of max for robustness against noise
+            if len(depth_map[plate_ring > 0]) > 0:
+                plate_depths = depth_map[plate_ring > 0]
+                global_plate_baseline = np.percentile(plate_depths, 90)  # Use 90th percentile for robustness
+                print(f"      Global plate baseline (90th percentile): {global_plate_baseline}")
+            else:
+                # Fallback: use 90th percentile of entire depth map
+                global_plate_baseline = np.percentile(depth_map, 90)
+                print(f"      Global plate baseline (90th percentile of full map): {global_plate_baseline}")
+
             processed_data = []
 
             if yolo_results.masks is not None:
-                print(f"  3. Processing {len(yolo_results.masks.data)} masks...")
-                for i, mask in enumerate(yolo_results.masks.data):
-                    print(f"    Processing mask {i+1}...")
-                # Resize mask to match original image dimensions
-                    mask_np = mask.cpu().numpy()
-                    mask_resized = cv2.resize(mask_np, (frame.shape[1], frame.shape[0]))
-
-                # --- HEIGHT CALCULATION LOGIC (FIXED) ---
-                # 1. Find the plate depth (baseline)
-                    kernel = np.ones((10,10), np.uint8)
-                    dilated = cv2.dilate(mask_resized, kernel, iterations=3)
-                    plate_ring = dilated - mask_resized
-
-                # For inverse depth (smaller = closer), the plate is FARTHER
-                # So plate baseline should be the MAX depth around the food
-                    if len(depth_map[plate_ring > 0]) > 0:
-                        plate_baseline = np.max(depth_map[plate_ring > 0])  # Use MAX for inverse depth
+                print(f"  4. Processing {len(yolo_results.boxes.data)} detections...")
+                # Iterate through boxes to ensure correct mask-to-label association
+                for i in range(len(yolo_results.boxes.data)):
+                    food_type = yolo_results.names[int(yolo_results.boxes.cls[i])]
+                    print(f"    Processing detection {i+1} (YOLO classified as: {food_type})...")
+                    
+                    # Get the corresponding mask for this detection
+                    if i < len(yolo_results.masks.data):
+                        mask = yolo_results.masks.data[i]
                     else:
-                        plate_baseline = np.max(depth_map)  # Fallback to global max
-                    print(f"      Plate baseline (max depth): {plate_baseline}")
+                        print(f"      No mask available for detection {i+1}")
+                        continue
+                
+                # Debug: Print mask info BEFORE resizing
+                    mask_np = mask.cpu().numpy()
+                    print(f"      BEFORE RESIZE - mask.shape: {mask_np.shape}")
+                    print(f"      BEFORE RESIZE - np.unique(mask): {np.unique(mask_np)}")
+                    print(f"      BEFORE RESIZE - mask.sum(): {mask_np.sum()}")
+                
+                # Resize mask to match original image dimensions
+                    mask_resized = cv2.resize(mask_np, (frame.shape[1], frame.shape[0]))
+                
+                # Debug: Print mask info AFTER resizing
+                    print(f"      AFTER RESIZE - mask.shape: {mask_resized.shape}")
+                    print(f"      AFTER RESIZE - np.unique(mask): {np.unique(mask_resized)}")
+                    print(f"      AFTER RESIZE - mask.sum(): {mask_resized.sum()}")
 
                 # 2. Find heights of food pixels
                     food_depths = depth_map[mask_resized > 0]
                 
-                # For inverse depth: Height = baseline - food_depth (closer = smaller number)
+                # For inverse depth: Height = global_plate_baseline - food_depth (closer = smaller number)
                 # This gives positive height values
-                    raw_heights = plate_baseline - food_depths
+                    raw_heights = global_plate_baseline - food_depths
                     raw_heights = np.maximum(raw_heights, 0)  # Remove negatives
                 
                 # Get the maximum raw height for normalization
                     max_raw_height = np.max(raw_heights) if len(raw_heights) > 0 else 1.0
                     print(f"      Max raw height: {max_raw_height}")
                 
-                # NORMALIZE to 0-1 range (0 = plate surface, 1 = highest point of food)
-                    if max_raw_height > 0:
-                        normalized_heights = raw_heights / max_raw_height
-                    else:
-                        normalized_heights = raw_heights
-                
-                    mean_relative_height = np.mean(normalized_heights)
-                    # Debug: check mask values before thresholding
+                # Calculate total raw volume units by summing all pixel heights
+                    # raw_heights is already extracted from the mask, so just sum it
+                    total_raw_volume_units = float(np.sum(raw_heights))
+
+                    # Count pixels in the binary mask for pixel area
+                    mask_binary = (mask_resized > 0.5).astype(np.uint8)
+                    pixel_area = int(np.sum(mask_binary))
+
                     print(f"      Mask resized shape: {mask_resized.shape}")
                     print(f"      Mask resized min/max: {mask_resized.min()}/{mask_resized.max()}")
                     print(f"      Mask resized unique values: {np.unique(mask_resized)[:10]}")
-                    # Threshold mask to binary (0 or 1) before summing to get accurate pixel count
-                    mask_binary = (mask_resized > 0.5).astype(np.uint8)
-                    pixel_area = int(np.sum(mask_binary))
-                    print(f"      Mask binary sum: {pixel_area}")
-                    print(f"      Mean relative height (normalized 0-1): {mean_relative_height}")
                     print(f"      Pixel area: {pixel_area}")
+                    print(f"      Max raw height: {max_raw_height}")
+                    print(f"      Total raw volume units: {total_raw_volume_units}")
+
 
                     processed_data.append({
-                        "food_type": yolo_results.names[int(yolo_results.boxes.cls[i])],
+                        "food_type": food_type,
                         "pixel_area": pixel_area,
-                        "mean_relative_height": mean_relative_height,  # Now 0-1 normalized!
-                        "plate_baseline": float(plate_baseline),
+                        "total_raw_volume_units": total_raw_volume_units,
+                        "plate_baseline": float(global_plate_baseline),
                         "max_raw_height": float(max_raw_height)
                     })
             else:

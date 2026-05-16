@@ -149,10 +149,10 @@ class SegmentationMask(BaseModel):
 
 class DepthData(BaseModel):
     """Depth and volume estimation data for a detected food item."""
-    mean_relative_height: float  # Relative height from plate baseline
     pixel_area: int  # Area in pixels
-    height_cm: float | None = None  # Real-world height in centimeters
+    height_cm: float | None = None  # Real-world height in centimeters (robust estimate)
     estimated_volume_cm3: float | None = None  # Real-world volume in cubic centimeters
+    height_stats: dict | None = None  # Robust height statistics (mean, p75, p90, max, effective)
     calibration: dict | None = None  # Plate calibration information
 
 

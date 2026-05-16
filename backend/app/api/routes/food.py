@@ -282,10 +282,11 @@ async def recognize_food(
         if pred.get("depth_data"):
             depth_data = DepthData(**pred["depth_data"])
             logger.info(f"    Depth data: height={depth_data.height_cm}cm, volume={depth_data.estimated_volume_cm3}cm³")
+            print(f"DEBUG HEIGHT -> mean_height_cm: {depth_data.height_cm}")
 
         # Determine estimation method based on available data
         estimation_method = "mask_area"
-        if depth_data and depth_data.mean_relative_height > 0:
+        if depth_data and depth_data.estimated_volume_cm3 and depth_data.estimated_volume_cm3 > 0:
             estimation_method = "depth_volume"
             logger.info(f"    Using estimation method: {estimation_method}")
 
@@ -299,9 +300,9 @@ async def recognize_food(
             image_height=image_height,
             calories_per_100g=calories_per_100g,
             standard_serving_size=standard_serving_size,
-            relative_height=depth_data.mean_relative_height if depth_data else None,  
+            relative_height=None,  # No longer used with voxel integration
             pixel_area=depth_data.pixel_area if depth_data else None,
-            density_g_per_cm3=density_g_per_cm3,  
+            density_g_per_cm3=density_g_per_cm3,
             volume_cm3=volume_cm3,
         )
         logger.info(f"    ✓ Portion: {portion_data['portion_grams']}g, Calories: {portion_data['estimated_calories']}")

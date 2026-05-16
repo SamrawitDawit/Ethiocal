@@ -82,12 +82,13 @@ class PlateCalibrator:
     def get_plate_relative_height(self, image: np.ndarray, depth_map: np.ndarray, skip_detection: bool = False) -> Optional[float]:
         """Get the relative height of the plate rim from depth data.
 
-        Uses the detected plate mask to sample depth values at the plate rim.
+        Uses the detected plate mask to sample depth values ONLY from the rim edge,
+        avoiding food pixels that sit on top of the plate.
 
         Args:
             image: RGB image for plate detection
             depth_map: Depth map from Depth Anything V2 (relative depths, 0-1 range)
-            skip_detection: If True, skip plate detection and use a simple center region
+            skip_detection: If True, skip plate detection and use frame margins
 
         Returns:
             Relative height value of the plate rim, or None if not found
@@ -103,13 +104,13 @@ class PlateCalibrator:
 
         try:
             if skip_detection:
-                # Fast path: use center region of image instead of detecting plate
+                # Fast path: sample only the extreme outer frame margins
+                # where food isn't placed (top/bottom thin strips)
                 h, w = depth_map.shape[:2]
-                # Use center 50% of image as plate region (fast fallback)
-                y1, y2 = h // 4, 3 * h // 4
-                x1, x2 = w // 4, 3 * w // 4
-                plate_depth_values = depth_map[y1:y2, x1:x2].flatten()
-                logger.info(f"Using center region for plate height (skipped detection)")
+                margin_height = int(h * 0.1)  # Top 10% margin
+                margin_top = depth_map[0:margin_height, :]
+                plate_depth_values = margin_top.flatten()
+                logger.info(f"Using top margin for plate height (skipped detection)")
             else:
                 # Get plate mask using CV detection
                 plate_mask = self.plate_detector.get_plate_mask(image)
@@ -122,8 +123,15 @@ class PlateCalibrator:
                 if depth_map.shape[:2] != plate_mask.shape:
                     depth_map = cv2.resize(depth_map, (plate_mask.shape[1], plate_mask.shape[0]))
 
-                # Get depth values only where plate is detected
-                plate_depth_values = depth_map[plate_mask > 0]
+                # Create an edge-only ring mask of the plate border
+                # This samples ONLY the rim, avoiding food sitting on the plate
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+                eroded_mask = cv2.erode(plate_mask, kernel)
+                rim_mask = cv2.bitwise_xor(plate_mask, eroded_mask)  # XOR keeps only the outer ring
+
+                plate_depth_values = depth_map[rim_mask > 0]
+
+                logger.info(f"Extracted plate rim edge mask: {len(plate_depth_values)} depth samples from rim")
 
             if len(plate_depth_values) > 0:
                 # The rim is typically the highest point (closest to camera)
@@ -135,10 +143,11 @@ class PlateCalibrator:
 
                 logger.info(f"Detected plate relative height: {plate_relative_height:.4f} "
                           f"(avg: {plate_avg_height:.4f}, samples: {len(plate_depth_values)})")
+                print(f"DEBUG RIM -> plate_relative_height (rim only): {plate_relative_height}")
                 self._cached_plate_relative_height = float(plate_relative_height)
                 return self._cached_plate_relative_height
             else:
-                logger.warning("No depth values found within plate region")
+                logger.warning("No depth values found within plate rim region")
                 return None
 
         except Exception as e:
@@ -146,6 +155,60 @@ class PlateCalibrator:
             return None
     
     
+    def calculate_voxel_volume_cm3(
+        self,
+        total_raw_volume_units: float,
+        pixel_to_cm_ratio: float,
+        max_raw_height: float = None,
+        plate_relative_height: float = None
+    ) -> float:
+        """Calculate true 3D volume from voxel-style integration.
+
+        Converts the sum of raw depth values (voxel units) into cubic centimeters
+        using calibration ratios.
+
+        Args:
+            total_raw_volume_units: Sum of all raw height values within the food mask
+            pixel_to_cm_ratio: Horizontal scale (cm per pixel)
+            max_raw_height: Maximum raw height for reference
+            plate_relative_height: Detected plate rim relative height
+
+        Returns:
+            Volume in cm³
+        """
+        # Horizontal area conversion: each pixel is pixel_to_cm_ratio² cm²
+        pixel_area_cm2 = pixel_to_cm_ratio ** 2
+
+        # Depth scale conversion: convert raw depth units to cm
+        if plate_relative_height and plate_relative_height > 0:
+            plate_depth_cm = self.plate_depth_cm  # Default 2.5cm
+            depth_to_cm_ratio = plate_depth_cm / plate_relative_height if plate_relative_height > 0 else 1.0
+            logger.info(f"Using plate calibration: depth_to_cm_ratio={depth_to_cm_ratio:.4f}")
+            print(f"DEBUG RATIO -> depth_to_cm_ratio: {depth_to_cm_ratio}")
+        else:
+            # Fallback: conservative estimate
+            # If max_raw_height exists, use it to estimate depth scale
+            if max_raw_height and max_raw_height > 0:
+                # Assume max raw height corresponds to ~5cm
+                depth_to_cm_ratio = 5.0 / max_raw_height
+            else:
+                depth_to_cm_ratio = 1.0
+            logger.info(f"Using fallback depth_to_cm_ratio={depth_to_cm_ratio:.4f}")
+            print(f"DEBUG RATIO -> depth_to_cm_ratio (fallback): {depth_to_cm_ratio}")
+
+        # Volume = sum of all pixel heights × (pixel_to_cm)² × depth_to_cm_ratio
+        volume_cm3 = total_raw_volume_units * pixel_area_cm2 * depth_to_cm_ratio
+
+        logger.info(
+            f"Voxel volume calculation: "
+            f"raw_units={total_raw_volume_units:.1f} × "
+            f"pixel_area_cm2={pixel_area_cm2:.6f} × "
+            f"depth_to_cm={depth_to_cm_ratio:.4f} = "
+            f"{volume_cm3:.1f}cm³"
+        )
+
+        return volume_cm3
+
     def calculate_real_world_volume(
         self,
         relative_height: float,
