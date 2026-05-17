@@ -144,15 +144,27 @@ def process_enhanced_results(
                     }
             
             # Add heuristic estimation data if available
-            # Match by food_type instead of index to ensure correct association
+            # Match by bounding box center since both depth_results and predictions come from same YOLO detections
             if depth_results:
-                matching_depth = None
-                for depth_result in depth_results:
-                    if depth_result.get("food_type") == label:
-                        matching_depth = depth_result
-                        break
+                pred_center_x = (x1 + x2) / 2
+                pred_center_y = (y1 + y2) / 2
 
-                if matching_depth:
+                matching_depth = None
+                best_distance = float('inf')
+
+                for depth_result in depth_results:
+                    if "box" in depth_result:
+                        depth_x1, depth_y1, depth_x2, depth_y2 = depth_result["box"]
+                        depth_center_x = (depth_x1 + depth_x2) / 2
+                        depth_center_y = (depth_y1 + depth_y2) / 2
+
+                        # Calculate distance between centers
+                        distance = ((pred_center_x - depth_center_x) ** 2 + (pred_center_y - depth_center_y) ** 2) ** 0.5
+                        if distance < best_distance:
+                            best_distance = distance
+                            matching_depth = depth_result
+
+                if matching_depth and best_distance < 50:  # Threshold for matching
                     # Use heuristic estimation data from vision engine
                     mask_pixel_count = int(matching_depth.get("mask_pixel_count", 0))
                     area_ratio = float(matching_depth.get("area_ratio", 0))
@@ -174,7 +186,8 @@ def process_enhanced_results(
                     )
                 else:
                     # No matching depth data found for this label
-                    continue
+                    # Include prediction anyway without depth data
+                    logger.warning(f"No matching depth data found for label: {label}")
 
             
             predictions.append(prediction)
@@ -230,6 +243,7 @@ async def predict_food_with_depth(
         yolo_results = yolo_model(
             image,
             conf=settings.YOLO_CONFIDENCE_THRESHOLD,
+            task="segment",
             verbose=False,
         )
         logger.info(f" YOLOv8 inference complete")

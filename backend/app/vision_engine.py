@@ -76,7 +76,7 @@ class FoodVolumeEstimator:
         try:
         # 1. Run YOLOv8 Segmentation
             print(f"  1. Running YOLOv8 segmentation...")
-            yolo_results = self.yolo_model(frame, conf=0.25)[0]
+            yolo_results = self.yolo_model(frame, conf=0.15, task="segment")[0]
             print(f"  YOLOv8 complete, masks: {yolo_results.masks is not None}")
 
         # 2. Run Depth Anything V2
@@ -196,17 +196,17 @@ class FoodVolumeEstimator:
                     # INJERA - Depth has very little influence
                     if "injera" in food_type_lower:
                         grams = 220 * area_ratio
-                        grams = float(np.clip(grams, 30, 250))
+                        grams = float(np.clip(grams, 30, 325))
                         print(f"      INJERA estimation: {grams:.1f}g (area_ratio={area_ratio:.4f})")
 
                     # SHIRO / MISIR / WAT - Use area + mound
-                    elif any(x in food_type_lower for x in ["shiro", "misir", "wat"]):
+                    elif any(x in food_type_lower for x in ["shiro", "misir", "wat", "wot", "alciha"]):
                         grams = 420 * area_ratio * (1 + mound_score * 0.6)
                         grams = float(np.clip(grams, 20, 400))
                         print(f"      SHIRO/MISIR/WAT estimation: {grams:.1f}g (area_ratio={area_ratio:.4f}, mound_score={mound_score:.2f})")
 
                     # GOMEN / SALAD - Lighter foods
-                    elif any(x in food_type_lower for x in ["gomen", "salad"]):
+                    elif any(x in food_type_lower for x in ["gomen", "selata", "fosoliya"]):
                         grams = 250 * area_ratio * (1 + mound_score * 0.3)
                         grams = float(np.clip(grams, 10, 250))
                         print(f"      GOMEN/SALAD estimation: {grams:.1f}g (area_ratio={area_ratio:.4f}, mound_score={mound_score:.2f})")
@@ -226,6 +226,7 @@ class FoodVolumeEstimator:
 
                     processed_data.append({
                         "food_type": food_type,
+                        "box": yolo_results.boxes.xyxy[i].tolist(),
                         "mask_pixel_count": mask_pixel_count,
                         "area_ratio": area_ratio,
                         "height_stats": height_stats,
@@ -233,7 +234,6 @@ class FoodVolumeEstimator:
                     })
             else:
                 print(f"  No masks found in YOLOv8 results")
-
             print(f"  Processed {len(processed_data)} items")
             print(f"[FoodVolumeEstimator.estimate] SUCCESS")
             return processed_data, depth_map

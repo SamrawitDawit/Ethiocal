@@ -122,10 +122,10 @@ class DailySummaryService:
                     food_item = item.get("food_item")
                     
                     if food_item:
-                        serving_multiplier = quantity
-                        total_protein += (food_item.get("protein", 0) * serving_multiplier)
-                        total_carbohydrates += (food_item.get("carbohydrates", 0) * serving_multiplier)
-                        total_fat += (food_item.get("fat", 0) * serving_multiplier)
+                        # Nutrient values in DB are per 100g, so multiply by quantity and divide by 100
+                        total_protein += (food_item.get("protein", 0) * quantity / 100)
+                        total_carbohydrates += (food_item.get("carbohydrates", 0) * quantity / 100)
+                        total_fat += (food_item.get("fat", 0) * quantity / 100)
                 print(f"Meal breakdown - Breakfast: {breakfast_calories}, Lunch: {lunch_calories}, Dinner: {dinner_calories}, Snack: {snack_calories}")
                 print(f"Nutrient totals - Protein: {total_protein:.1f}, Carbs: {total_carbohydrates:.1f}, Fat: {total_fat:.1f}")
             

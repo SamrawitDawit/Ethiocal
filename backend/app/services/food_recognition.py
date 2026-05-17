@@ -140,6 +140,7 @@ async def predict_food(image_bytes: bytes, filename: str) -> tuple[list[dict], i
         results = model(
             image,
             conf=settings.YOLO_CONFIDENCE_THRESHOLD,
+            task="segment",
             verbose=False,
         )
 
