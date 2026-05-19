@@ -260,8 +260,8 @@ async def predict_food_with_depth(
                 volume_estimator = get_volume_estimator()
                 logger.info(f"  Volume estimator loaded successfully")
 
-                logger.info(f"  8. Running depth estimation...")
-                depth_results, depth_map = volume_estimator.estimate(image_np)
+                logger.info(f"  8. Running depth estimation with YOLO results...")
+                depth_results, depth_map = volume_estimator.estimate(image_np, yolo_results=yolo_results)
                 logger.info(f" Depth estimation completed for {len(depth_results)} food items")
             except Exception as e:
                 logger.error(f" Depth estimation failed: {type(e).__name__}: {e}", exc_info=True)

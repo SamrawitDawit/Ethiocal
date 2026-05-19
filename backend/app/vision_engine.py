@@ -71,12 +71,16 @@ class FoodVolumeEstimator:
         print(f"   Model ready on {self.device}")
         print(f"[FoodVolumeEstimator.__init__] SUCCESS")
 
-    def estimate(self, frame):
+    def estimate(self, frame, yolo_results=None):
         print(f"[FoodVolumeEstimator.estimate] START - frame shape: {frame.shape}")
         try:
-        # 1. Run YOLOv8 Segmentation
+        # 1. Run YOLOv8 Segmentation (or use provided results)
             print(f"  1. Running YOLOv8 segmentation...")
-            yolo_results = self.yolo_model(frame, conf=0.15, task="segment")[0]
+            if yolo_results is not None:
+                print(f"  Using provided YOLO results")
+                yolo_results = yolo_results[0] if isinstance(yolo_results, list) else yolo_results
+            else:
+                yolo_results = self.yolo_model(frame, conf=0.15, task="segment")[0]
             print(f"  YOLOv8 complete, masks: {yolo_results.masks is not None}")
 
         # 2. Run Depth Anything V2
